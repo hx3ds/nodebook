@@ -1,0 +1,25 @@
+{
+  "name": "a",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hx3ds/a.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/hx3ds/a/issues"
+  },
+  "homepage": "https://github.com/hx3ds/a#readme",
+  "description": "",
+  "devDependencies": {
+    "vite": "^7.1.12"
+  }
+}

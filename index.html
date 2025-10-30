@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Box Diagram</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="contextMenu">
+        <button id="menuDelete" onclick="app.deleteSelectedElement()">Delete</button>
+        <button onclick="app.exportCanvasJSON()">Export Canvas (JSON)</button>
+        <button onclick="app.exportCanvasPNG()">Export Canvas (PNG)</button>
+        <button onclick="document.getElementById('importFile').click()">Import Canvas (JSON)</button>
+    </div>
+    <input id="importFile" type="file" accept="application/json,.json" style="display:none" />
+    
+    <textarea id="textInput"></textarea>
+    
+    <canvas id="canvas"></canvas>
+    
+    <script>
+        const app = {
+            canvas: null,
+            ctx: null,
+            boxes: [],
+            arrows: [],
+            selectedBox: null,
+            selectedArrow: null,
+            connectingFrom: null,
+            connectingTo: null,
+            editingBox: null,
+            dragging: false,
+            middleDragging: false,
+            panningCanvas: false,
+            resizingBox: null,
+            resizeHandle: null,
+            dragOffset: { x: 0, y: 0 },
+            canvasOffset: { x: 0, y: 0 },
+            lastMousePos: { x: 0, y: 0 },
+            lastPanPos: { x: 0, y: 0 },
+            dpr: 1,
+            
+            init() {
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.resizeCanvas();
+                window.addEventListener('resize', () => this.resizeCanvas());
+                
+                this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+                this.canvas.addEventListener('mouseleave', () => {
+                    this.panningCanvas = false;
+                    this.middleDragging = false;
+                    this.dragging = false;
+                    this.connectingFrom = null;
+                    this.connectingTo = null;
+                });
+                this.canvas.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
+                this.canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                }, { passive: false });
+                this.canvas.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    this.handleRightClick(e);
+                });
+                // drag & drop import
+                this.canvas.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                });
+                this.canvas.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        const file = e.dataTransfer.files[0];
+                        this.importFromFile(file);
+                    }
+                });
+                
+                document.addEventListener('click', (e) => {
+                    const menu = document.getElementById('contextMenu');
+                    if (menu && !menu.contains(e.target)) {
+                        this.hideContextMenu();
+                    }
+                });
+                
+                document.addEventListener('keydown', (e) => this.handleKeyDown(e));
+                
+                const textInput = document.getElementById('textInput');
+                const importFile = document.getElementById('importFile');
+                textInput.addEventListener('input', () => {
+                    if (this.editingBox) {
+                        this.editingBox.text = textInput.value;
+                        this.render();
+                    }
+                });
+                
+                textInput.addEventListener('blur', () => {
+                    this.finishEditing();
+                });
+                
+                textInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        this.finishEditing();
+                        e.preventDefault();
+                    }
+                    e.stopPropagation();
+                });
+                importFile.addEventListener('change', (e) => {
+                    const file = e.target.files && e.target.files[0];
+                    if (file) {
+                        this.importFromFile(file);
+                        e.target.value = '';
+                    }
+                });
+                
+                this.loadState();
+                this.render();
+            },
+            
+            exportCanvasJSON() {
+                const state = this.serializeState();
+                const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                a.href = url;
+                a.download = `canvas-${ts}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            },
+            
+            exportCanvasPNG() {
+                const off = document.createElement('canvas');
+                off.width = this.canvas.width;
+                off.height = this.canvas.height;
+                const octx = off.getContext('2d');
+                octx.fillStyle = '#ffffff';
+                octx.fillRect(0, 0, off.width, off.height);
+                octx.drawImage(this.canvas, 0, 0);
+                off.toBlob((blob) => {
+                    if (!blob) return;
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                    a.href = url;
+                    a.download = `canvas-${ts}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 'image/png');
+            },
+            
+            importFromFile(file) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    try {
+                        const data = JSON.parse(reader.result);
+                        this.loadFromState(data);
+                        this.saveState();
+                        this.render();
+                    } catch (_) {
+                    }
+                };
+                reader.readAsText(file);
+            },
+            
+            serializeState() {
+                return {
+                    boxes: this.boxes.map(box => ({
+                        id: box.id,
+                        x: box.x,
+                        y: box.y,
+                        width: box.width,
+                        height: box.height,
+                        defaultWidth: box.defaultWidth,
+                        defaultHeight: box.defaultHeight,
+                        text: box.text,
+                        expanded: !!box.expanded
+                    })),
+                    arrows: this.arrows.map(a => ({
+                        sourceId: a.source.id,
+                        targetId: a.target.id
+                    }))
+                };
+            },
+            
+            loadFromState(state) {
+                if (!state || !Array.isArray(state.boxes) || !Array.isArray(state.arrows)) {
+                    return;
+                }
+                const idToBox = new Map();
+                this.boxes = state.boxes.map(b => {
+                    const box = {
+                        id: b.id || (Date.now() + Math.random()),
+                        x: b.x,
+                        y: b.y,
+                        width: b.width,
+                        height: b.height,
+                        defaultWidth: b.defaultWidth ?? b.width,
+                        defaultHeight: b.defaultHeight ?? b.height,
+                        text: b.text || '',
+                        expanded: !!b.expanded
+                    };
+                    idToBox.set(box.id, box);
+                    return box;
+                });
+                this.arrows = state.arrows
+                    .map(a => {
+                        const source = idToBox.get(a.sourceId);
+                        const target = idToBox.get(a.targetId);
+                        if (source && target && source !== target) {
+                            return { source, target };
+                        }
+                        return null;
+                    })
+                    .filter(Boolean);
+                this.selectedBox = null;
+                this.selectedArrow = null;
+                this.connectingFrom = null;
+                this.connectingTo = null;
+            },
+            
+            resizeCanvas() {
+                this.dpr = window.devicePixelRatio || 1;
+                const width = window.innerWidth;
+                const height = window.innerHeight;
+                this.canvas.width = width * this.dpr;
+                this.canvas.height = height * this.dpr;
+                this.canvas.style.width = width + 'px';
+                this.canvas.style.height = height + 'px';
+                this.ctx.scale(this.dpr, this.dpr);
+                this.render();
+            },
+            
+            getMousePos(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                return {
+                    x: (e.clientX - rect.left) - this.canvasOffset.x,
+                    y: (e.clientY - rect.top) - this.canvasOffset.y
+                };
+            },
+            
+            createBox(x, y) {
+                const box = {
+                    id: Date.now() + Math.random(),
+                    x: x - 75,
+                    y: y - 40,
+                    width: 150,
+                    height: 80,
+                    defaultWidth: 150,
+                    defaultHeight: 80,
+                    text: '',
+                    selected: false,
+                    expanded: false
+                };
+                this.boxes.push(box);
+                this.saveState();
+                this.render();
+            },
+            
+            findBoxAt(x, y) {
+                for (let i = this.boxes.length - 1; i >= 0; i--) {
+                    const box = this.boxes[i];
+                    if (x >= box.x && x <= box.x + box.width &&
+                        y >= box.y && y <= box.y + box.height) {
+                        return box;
+                    }
+                }
+                return null;
+            },
+            
+            isExpandButtonAt(x, y, box) {
+                if (!this.shouldShowExpandButton(box)) {
+                    return false;
+                }
+                const buttonRadius = 10;
+                const buttonX = box.x + box.width - buttonRadius - 8;
+                const buttonY = box.y + buttonRadius + 8;
+                const distance = Math.sqrt((x - buttonX) ** 2 + (y - buttonY) ** 2);
+                return distance <= buttonRadius;
+            },
+            
+            shouldShowExpandButton(box) {
+                if (!box.text || box.text.trim() === '') {
+                    return false;
+                }
+                const padding = 20;
+                const maxWidth = box.defaultWidth - padding * 2;
+                this.ctx.font = '15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                const lines = this.wrapText(box.text, maxWidth);
+                const lineHeight = 20;
+                const maxLines = Math.floor((box.defaultHeight - padding * 2) / lineHeight);
+                return lines.length > maxLines || lines.length > 1;
+            },
+            
+            toggleBoxExpansion(box) {
+                if (box.expanded) {
+                    box.width = box.defaultWidth;
+                    box.height = box.defaultHeight;
+                    box.expanded = false;
+                } else {
+                    const measurements = this.measureText(box.text);
+                    box.height = Math.max(box.defaultHeight, measurements.height + 40);
+                    box.expanded = true;
+                }
+                this.saveState();
+                this.render();
+            },
+            
+            getResizeHandle(x, y, box) {
+                const handleSize = 8;
+                const tolerance = 4;
+                
+                const right = box.x + box.width;
+                const bottom = box.y + box.height;
+                
+                if (Math.abs(x - right) <= handleSize + tolerance && 
+                    Math.abs(y - bottom) <= handleSize + tolerance) {
+                    return 'se';
+                }
+                
+                if (Math.abs(x - right) <= handleSize + tolerance && 
+                    y >= box.y + tolerance && y <= bottom - tolerance) {
+                    return 'e';
+                }
+                
+                if (Math.abs(y - bottom) <= handleSize + tolerance && 
+                    x >= box.x + tolerance && x <= right - tolerance) {
+                    return 's';
+                }
+                
+                return null;
+            },
+            
+            measureText(text) {
+                this.ctx.font = '15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                const maxWidth = 600;
+                const lineHeight = 20;
+                
+                const lines = this.wrapText(text, maxWidth);
+                const width = Math.max(...lines.map(line => this.ctx.measureText(line).width), 100);
+                const height = lines.length * lineHeight;
+                
+                return { width, height, lines };
+            },
+            
+            wrapText(text, maxWidth) {
+                if (!text || text.trim() === '') {
+                    return [''];
+                }
+                
+                const lines = [];
+                const paragraphs = text.split('\n');
+                
+                for (const paragraph of paragraphs) {
+                    if (paragraph.trim() === '') {
+                        lines.push('');
+                        continue;
+                    }
+                    
+                    const words = paragraph.split(' ');
+                    let currentLine = '';
+                    
+                    for (const word of words) {
+                        const testLine = currentLine ? currentLine + ' ' + word : word;
+                        const metrics = this.ctx.measureText(testLine);
+                        
+                        if (metrics.width > maxWidth) {
+                            if (currentLine) {
+                                lines.push(currentLine);
+                                currentLine = word;
+                            } else {
+                                let charLine = '';
+                                for (const char of word) {
+                                    const testChar = charLine + char;
+                                    const charMetrics = this.ctx.measureText(testChar);
+                                    if (charMetrics.width > maxWidth && charLine) {
+                                        lines.push(charLine);
+                                        charLine = char;
+                                    } else {
+                                        charLine = testChar;
+                                    }
+                                }
+                                if (charLine) {
+                                    currentLine = charLine;
+                                }
+                            }
+                        } else {
+                            currentLine = testLine;
+                        }
+                    }
+                    
+                    if (currentLine) {
+                        lines.push(currentLine);
+                    }
+                }
+                
+                return lines.length > 0 ? lines : [''];
+            },
+            
+            findArrowAt(x, y) {
+                for (let i = this.arrows.length - 1; i >= 0; i--) {
+                    const arrow = this.arrows[i];
+                    const path = this.calculateArrowPath(arrow);
+                    if (this.isPointNearPath(x, y, path)) {
+                        return arrow;
+                    }
+                }
+                return null;
+            },
+            
+            calculateArrowPath(arrow) {
+                const source = arrow.source;
+                const target = arrow.target;
+                
+                const sourceCenter = {
+                    x: source.x + source.width / 2,
+                    y: source.y + source.height / 2
+                };
+                const targetCenter = {
+                    x: target.x + target.width / 2,
+                    y: target.y + target.height / 2
+                };
+                
+                const dx = targetCenter.x - sourceCenter.x;
+                const dy = targetCenter.y - sourceCenter.y;
+                
+                const sourceEdge = this.getBoxEdgePoint(source, dx, dy);
+                const targetEdge = this.getBoxEdgePoint(target, -dx, -dy);
+                
+                const sourceSide = this.getBoxSide(source, dx, dy);
+                const targetSide = this.getBoxSide(target, -dx, -dy);
+                
+                const distance = Math.sqrt(
+                    (targetEdge.x - sourceEdge.x) ** 2 + 
+                    (targetEdge.y - sourceEdge.y) ** 2
+                );
+                
+                const handleDistance = Math.min(distance * 0.45, 100);
+                
+                let cp1x, cp1y, cp2x, cp2y;
+                
+                switch(sourceSide) {
+                    case 'right':
+                        cp1x = sourceEdge.x + handleDistance;
+                        cp1y = sourceEdge.y;
+                        break;
+                    case 'left':
+                        cp1x = sourceEdge.x - handleDistance;
+                        cp1y = sourceEdge.y;
+                        break;
+                    case 'bottom':
+                        cp1x = sourceEdge.x;
+                        cp1y = sourceEdge.y + handleDistance;
+                        break;
+                    case 'top':
+                        cp1x = sourceEdge.x;
+                        cp1y = sourceEdge.y - handleDistance;
+                        break;
+                }
+                
+                switch(targetSide) {
+                    case 'right':
+                        cp2x = targetEdge.x + handleDistance;
+                        cp2y = targetEdge.y;
+                        break;
+                    case 'left':
+                        cp2x = targetEdge.x - handleDistance;
+                        cp2y = targetEdge.y;
+                        break;
+                    case 'bottom':
+                        cp2x = targetEdge.x;
+                        cp2y = targetEdge.y + handleDistance;
+                        break;
+                    case 'top':
+                        cp2x = targetEdge.x;
+                        cp2y = targetEdge.y - handleDistance;
+                        break;
+                }
+                
+                return {
+                    x1: sourceEdge.x,
+                    y1: sourceEdge.y,
+                    cp1x: cp1x,
+                    cp1y: cp1y,
+                    cp2x: cp2x,
+                    cp2y: cp2y,
+                    x2: targetEdge.x,
+                    y2: targetEdge.y
+                };
+            },
+            
+            getBoxSide(box, dx, dy) {
+                const centerX = box.x + box.width / 2;
+                const centerY = box.y + box.height / 2;
+                
+                const angle = Math.atan2(dy, dx);
+                const halfWidth = box.width / 2;
+                const halfHeight = box.height / 2;
+                
+                const cos = Math.cos(angle);
+                const sin = Math.sin(angle);
+                
+                if (Math.abs(cos) > Math.abs(sin * halfWidth / halfHeight)) {
+                    return cos > 0 ? 'right' : 'left';
+                } else {
+                    return sin > 0 ? 'bottom' : 'top';
+                }
+            },
+            
+            getBoxEdgePoint(box, dx, dy) {
+                const centerX = box.x + box.width / 2;
+                const centerY = box.y + box.height / 2;
+                
+                const angle = Math.atan2(dy, dx);
+                
+                const cos = Math.cos(angle);
+                const sin = Math.sin(angle);
+                
+                const halfWidth = box.width / 2;
+                const halfHeight = box.height / 2;
+                
+                let edgeX, edgeY;
+                
+                if (Math.abs(cos) > Math.abs(sin * halfWidth / halfHeight)) {
+                    edgeX = centerX + Math.sign(cos) * halfWidth;
+                    edgeY = centerY + Math.sign(cos) * halfWidth * Math.tan(angle);
+                } else {
+                    edgeX = centerX + Math.sign(sin) * halfHeight / Math.tan(angle);
+                    edgeY = centerY + Math.sign(sin) * halfHeight;
+                }
+                
+                return { x: edgeX, y: edgeY };
+            },
+            
+            isPointNearPath(x, y, path) {
+                const segments = 30;
+                let minDist = Infinity;
+                
+                for (let i = 0; i <= segments; i++) {
+                    const t = i / segments;
+                    const mt = 1 - t;
+                    const curveX = mt * mt * mt * path.x1 + 
+                                   3 * mt * mt * t * path.cp1x + 
+                                   3 * mt * t * t * path.cp2x + 
+                                   t * t * t * path.x2;
+                    const curveY = mt * mt * mt * path.y1 + 
+                                   3 * mt * mt * t * path.cp1y + 
+                                   3 * mt * t * t * path.cp2y + 
+                                   t * t * t * path.y2;
+                    const dist = Math.sqrt((x - curveX) ** 2 + (y - curveY) ** 2);
+                    minDist = Math.min(minDist, dist);
+                }
+                
+                return minDist < 10;
+            },
+            
+            pointToLineDistance(px, py, x1, y1, x2, y2) {
+                const A = px - x1;
+                const B = py - y1;
+                const C = x2 - x1;
+                const D = y2 - y1;
+                
+                const dot = A * C + B * D;
+                const lenSq = C * C + D * D;
+                let param = -1;
+                
+                if (lenSq !== 0) param = dot / lenSq;
+                
+                let xx, yy;
+                
+                if (param < 0) {
+                    xx = x1;
+                    yy = y1;
+                } else if (param > 1) {
+                    xx = x2;
+                    yy = y2;
+                } else {
+                    xx = x1 + param * C;
+                    yy = y1 + param * D;
+                }
+                
+                const dx = px - xx;
+                const dy = py - yy;
+                return Math.sqrt(dx * dx + dy * dy);
+            },
+            
+            connectBoxes(source, target) {
+                if (source === target) return;
+                
+                for (const arrow of this.arrows) {
+                    if (arrow.source === source && arrow.target === target) {
+                        return;
+                    }
+                }
+                
+                this.arrows.push({ source, target });
+                this.saveState();
+                this.render();
+            },
+            
+            startEditing(box, clickX, clickY) {
+                this.editingBox = box;
+                const textInput = document.getElementById('textInput');
+                textInput.value = box.text;
+                
+                const rect = this.canvas.getBoundingClientRect();
+                const boxScreenX = box.x + this.canvasOffset.x + rect.left;
+                const boxScreenY = box.y + this.canvasOffset.y + rect.top;
+                
+                textInput.style.left = boxScreenX + 'px';
+                textInput.style.top = boxScreenY + 'px';
+                textInput.style.width = box.width + 'px';
+                textInput.style.height = box.height + 'px';
+                textInput.style.display = 'block';
+                textInput.focus();
+                
+                if (clickX !== undefined && clickY !== undefined) {
+                    setTimeout(() => {
+                        const relativeX = clickX - box.x;
+                        const relativeY = clickY - box.y;
+                        
+                        const charIndex = this.getCharIndexFromPoint(textInput, relativeX, relativeY);
+                        textInput.setSelectionRange(charIndex, charIndex);
+                    }, 0);
+                } else {
+                    textInput.select();
+                }
+                
+                this.render();
+            },
+            
+            getCharIndexFromPoint(textInput, x, y) {
+                const text = textInput.value;
+                let bestIndex = text.length;
+                return bestIndex;
+            },
+            
+            finishEditing() {
+                if (this.editingBox) {
+                    const textInput = document.getElementById('textInput');
+                    this.editingBox.text = textInput.value;
+                    this.editingBox = null;
+                    textInput.style.display = 'none';
+                    this.saveState();
+                    this.render();
+                }
+            },
+            
+            handleMouseDown(e) {
+                const pos = this.getMousePos(e);
+                const box = this.findBoxAt(pos.x, pos.y);
+                const arrow = this.findArrowAt(pos.x, pos.y);
+                
+                if (this.editingBox && this.editingBox !== box) {
+                    this.finishEditing();
+                }
+                
+                if (box && this.isExpandButtonAt(pos.x, pos.y, box)) {
+                    this.toggleBoxExpansion(box);
+                    return;
+                }
+                
+                if (e.button === 1) {
+                    if (box) {
+                        this.selectedBox = box;
+                        this.selectedArrow = null;
+                        // bring box to front
+                        const idx = this.boxes.indexOf(box);
+                        if (idx > -1) {
+                            this.boxes.splice(idx, 1);
+                            this.boxes.push(box);
+                        }
+                        this.middleDragging = true;
+                        this.dragOffset = {
+                            x: pos.x - box.x,
+                            y: pos.y - box.y
+                        };
+                        this.canvas.style.cursor = 'move';
+                    } else {
+                        this.panningCanvas = true;
+                        this.lastPanPos = { x: e.clientX, y: e.clientY };
+                        this.canvas.style.cursor = 'grab';
+                    }
+                    this.render();
+                    return;
+                }
+                
+                if (e.button === 2) {
+                    return;
+                }
+                
+                if (box) {
+                    if (this.editingBox === box) {
+                        return;
+                    }
+                    
+                    const resizeHandle = this.getResizeHandle(pos.x, pos.y, box);
+                    if (resizeHandle) {
+                        this.resizingBox = box;
+                        this.resizeHandle = resizeHandle;
+                        this.selectedBox = box;
+                        this.selectedArrow = null;
+                        // bring box to front
+                        const idx = this.boxes.indexOf(box);
+                        if (idx > -1) {
+                            this.boxes.splice(idx, 1);
+                            this.boxes.push(box);
+                        }
+                        return;
+                    }
+                    
+                    this.selectedBox = box;
+                    this.selectedArrow = null;
+                    // bring box to front
+                    const idx2 = this.boxes.indexOf(box);
+                    if (idx2 > -1) {
+                        this.boxes.splice(idx2, 1);
+                        this.boxes.push(box);
+                    }
+                    this.connectingFrom = box;
+                    this.dragging = true;
+                    this.dragOffset = {
+                        x: pos.x - box.x,
+                        y: pos.y - box.y
+                    };
+                    this.canvas.style.cursor = 'crosshair';
+                } else if (arrow) {
+                    this.selectedBox = null;
+                    this.selectedArrow = arrow;
+                    // bring arrow to front
+                    const aidx = this.arrows.indexOf(arrow);
+                    if (aidx > -1) {
+                        this.arrows.splice(aidx, 1);
+                        this.arrows.push(arrow);
+                    }
+                } else {
+                    this.selectedBox = null;
+                    this.selectedArrow = null;
+                    this.connectingFrom = null;
+                }
+                
+                this.render();
+            },
+            
+            handleMouseMove(e) {
+                if (this.panningCanvas) {
+                    const dx = e.clientX - this.lastPanPos.x;
+                    const dy = e.clientY - this.lastPanPos.y;
+                    this.canvasOffset.x += dx;
+                    this.canvasOffset.y += dy;
+                    this.lastPanPos = { x: e.clientX, y: e.clientY };
+                    this.canvas.style.cursor = 'grabbing';
+                    this.render();
+                    return;
+                }
+                
+                const pos = this.getMousePos(e);
+                this.lastMousePos = pos;
+                
+                if (this.resizingBox) {
+                    const minSize = 50;
+                    if (this.resizeHandle === 'se') {
+                        this.resizingBox.width = Math.max(minSize, pos.x - this.resizingBox.x);
+                        this.resizingBox.height = Math.max(minSize, pos.y - this.resizingBox.y);
+                    } else if (this.resizeHandle === 'e') {
+                        this.resizingBox.width = Math.max(minSize, pos.x - this.resizingBox.x);
+                    } else if (this.resizeHandle === 's') {
+                        this.resizingBox.height = Math.max(minSize, pos.y - this.resizingBox.y);
+                    }
+                    this.render();
+                    return;
+                }
+                
+                if (this.middleDragging && this.selectedBox) {
+                    this.selectedBox.x = pos.x - this.dragOffset.x;
+                    this.selectedBox.y = pos.y - this.dragOffset.y;
+                    this.render();
+                    return;
+                }
+                
+                if (this.dragging && this.connectingFrom) {
+                    const targetBox = this.findBoxAt(pos.x, pos.y);
+                    if (targetBox && targetBox !== this.connectingFrom) {
+                        this.connectingTo = targetBox;
+                    } else {
+                        this.connectingTo = null;
+                    }
+                    this.render();
+                } else {
+                    const box = this.findBoxAt(pos.x, pos.y);
+                    if (box) {
+                        if (this.isExpandButtonAt(pos.x, pos.y, box)) {
+                            this.canvas.style.cursor = 'pointer';
+                        } else {
+                            const resizeHandle = this.getResizeHandle(pos.x, pos.y, box);
+                            if (resizeHandle === 'se') {
+                                this.canvas.style.cursor = 'nwse-resize';
+                            } else if (resizeHandle === 'e') {
+                                this.canvas.style.cursor = 'ew-resize';
+                            } else if (resizeHandle === 's') {
+                                this.canvas.style.cursor = 'ns-resize';
+                            } else {
+                                this.canvas.style.cursor = 'pointer';
+                            }
+                        }
+                    } else {
+                        this.canvas.style.cursor = 'default';
+                    }
+                }
+            },
+            
+            handleMouseUp(e) {
+                if (this.resizingBox) {
+                    this.resizingBox.defaultWidth = this.resizingBox.width;
+                    this.resizingBox.defaultHeight = this.resizingBox.height;
+                    this.resizingBox = null;
+                    this.resizeHandle = null;
+                    this.canvas.style.cursor = 'default';
+                    this.saveState();
+                    return;
+                }
+                
+                if (e.button === 1) {
+                    if (this.panningCanvas) {
+                        this.panningCanvas = false;
+                        this.canvas.style.cursor = 'default';
+                        return;
+                    }
+                    if (this.middleDragging) {
+                        this.middleDragging = false;
+                        this.canvas.style.cursor = 'default';
+                        this.saveState();
+                        return;
+                    }
+                }
+                
+                if (this.dragging && this.connectingFrom) {
+                    const pos = this.getMousePos(e);
+                    const targetBox = this.findBoxAt(pos.x, pos.y);
+                    
+                    if (targetBox && targetBox !== this.connectingFrom) {
+                        this.connectBoxes(this.connectingFrom, targetBox);
+                    }
+                    
+                    this.dragging = false;
+                    this.connectingFrom = null;
+                    this.connectingTo = null;
+                    this.saveState();
+                    this.render();
+                }
+            },
+            
+            handleDoubleClick(e) {
+                const pos = this.getMousePos(e);
+                const box = this.findBoxAt(pos.x, pos.y);
+                
+                if (box) {
+                    this.startEditing(box, pos.x, pos.y);
+                } else {
+                    this.createBox(pos.x, pos.y);
+                }
+            },
+            
+            handleRightClick(e) {
+                const pos = this.getMousePos(e);
+                const box = this.findBoxAt(pos.x, pos.y);
+                const arrow = this.findArrowAt(pos.x, pos.y);
+                this.selectedBox = box || null;
+                this.selectedArrow = arrow || null;
+                if (box) {
+                    const idx = this.boxes.indexOf(box);
+                    if (idx > -1) {
+                        this.boxes.splice(idx, 1);
+                        this.boxes.push(box);
+                    }
+                }
+                if (arrow) {
+                    const aidx = this.arrows.indexOf(arrow);
+                    if (aidx > -1) {
+                        this.arrows.splice(aidx, 1);
+                        this.arrows.push(arrow);
+                    }
+                }
+                this.showContextMenu(e.clientX, e.clientY);
+                this.render();
+                e.preventDefault();
+            },
+            
+            showContextMenu(x, y) {
+                const menu = document.getElementById('contextMenu');
+                const del = document.getElementById('menuDelete');
+                if (del) {
+                    const hasSelection = !!(this.selectedBox || this.selectedArrow);
+                    del.style.display = hasSelection ? 'block' : 'none';
+                }
+                menu.style.display = 'block';
+                menu.style.left = x + 'px';
+                menu.style.top = y + 'px';
+            },
+            
+            hideContextMenu() {
+                const menu = document.getElementById('contextMenu');
+                if (menu) {
+                    menu.style.display = 'none';
+                }
+            },
+            
+            handleKeyDown(e) {
+                if (this.editingBox) {
+                    return;
+                }
+                
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    if (this.selectedBox) {
+                        this.boxes = this.boxes.filter(b => b !== this.selectedBox);
+                        this.arrows = this.arrows.filter(a => 
+                            a.source !== this.selectedBox && a.target !== this.selectedBox
+                        );
+                        this.selectedBox = null;
+                        this.saveState();
+                        this.render();
+                    }
+                } else if (e.key === 'Escape') {
+                    this.selectedBox = null;
+                    this.selectedArrow = null;
+                    this.canvas.style.cursor = 'default';
+                    this.render();
+                } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                    if (this.selectedBox || this.selectedArrow) {
+                        this.deleteSelectedElement();
+                    }
+                }
+            },
+            
+            render() {
+                this.ctx.clearRect(0, 0, this.canvas.width / this.dpr, this.canvas.height / this.dpr);
+                
+                this.ctx.save();
+                this.ctx.translate(this.canvasOffset.x, this.canvasOffset.y);
+                
+                this.arrows.forEach(arrow => {
+                    this.drawArrow(arrow);
+                });
+                
+                this.boxes.forEach(box => {
+                    this.drawBox(box);
+                });
+                
+                if (this.connectingFrom && this.dragging) {
+                    if (this.connectingTo) {
+                        const previewArrow = {
+                            source: this.connectingFrom,
+                            target: this.connectingTo
+                        };
+                        const path = this.calculateArrowPath(previewArrow);
+                        
+                        this.ctx.strokeStyle = '#4285f4';
+                        this.ctx.lineWidth = 2.5;
+                        this.ctx.lineCap = 'round';
+                        this.ctx.lineJoin = 'round';
+                        this.ctx.globalAlpha = 0.7;
+                        this.ctx.setLineDash([5, 5]);
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(path.x1, path.y1);
+                        this.ctx.bezierCurveTo(path.cp1x, path.cp1y, path.cp2x, path.cp2y, path.x2, path.y2);
+                        this.ctx.stroke();
+                        this.ctx.setLineDash([]);
+                        this.ctx.globalAlpha = 1.0;
+                    } else {
+                        const pos = this.lastMousePos;
+                        const sourceEdge = this.getBoxEdgePoint(
+                            this.connectingFrom,
+                            pos.x - (this.connectingFrom.x + this.connectingFrom.width / 2),
+                            pos.y - (this.connectingFrom.y + this.connectingFrom.height / 2)
+                        );
+                        
+                        this.ctx.strokeStyle = '#9aa0a6';
+                        this.ctx.setLineDash([5, 5]);
+                        this.ctx.lineWidth = 1.5;
+                        this.ctx.lineCap = 'round';
+                        this.ctx.globalAlpha = 0.5;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(sourceEdge.x, sourceEdge.y);
+                        this.ctx.lineTo(pos.x, pos.y);
+                        this.ctx.stroke();
+                        this.ctx.setLineDash([]);
+                        this.ctx.globalAlpha = 1.0;
+                    }
+                }
+                
+                this.ctx.restore();
+            },
+            
+            drawBox(box) {
+                const radius = 8;
+                const x = box.x;
+                const y = box.y;
+                const w = box.width;
+                const h = box.height;
+                
+                this.ctx.save();
+                
+                this.ctx.beginPath();
+                this.ctx.moveTo(x + radius, y);
+                this.ctx.lineTo(x + w - radius, y);
+                this.ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+                this.ctx.lineTo(x + w, y + h - radius);
+                this.ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+                this.ctx.lineTo(x + radius, y + h);
+                this.ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+                this.ctx.lineTo(x, y + radius);
+                this.ctx.quadraticCurveTo(x, y, x + radius, y);
+                this.ctx.closePath();
+                
+                const isSelected = this.selectedBox === box;
+                
+                if (isSelected) {
+                    this.ctx.shadowColor = 'rgba(0, 0, 0, 0.08)';
+                    this.ctx.shadowBlur = 8;
+                    this.ctx.shadowOffsetX = 0;
+                    this.ctx.shadowOffsetY = 2;
+                    this.ctx.fillStyle = '#ffffff';
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#4285f4';
+                    this.ctx.lineWidth = 2;
+                } else {
+                    this.ctx.shadowColor = 'rgba(0, 0, 0, 0.08)';
+                    this.ctx.shadowBlur = 6;
+                    this.ctx.shadowOffsetX = 0;
+                    this.ctx.shadowOffsetY = 2;
+                    this.ctx.fillStyle = '#ffffff';
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#dadce0';
+                    this.ctx.lineWidth = 1;
+                }
+                
+                this.ctx.stroke();
+                this.ctx.restore();
+                
+                this.ctx.save();
+                this.ctx.beginPath();
+                this.ctx.rect(x, y, w, h);
+                this.ctx.clip();
+                
+                const isEditing = this.editingBox === box;
+                
+                if (isEditing) {
+                    this.ctx.restore();
+                    return;
+                }
+                
+                this.ctx.font = '15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                this.ctx.fillStyle = isSelected ? '#1a73e8' : '#3c4043';
+                
+                if (box.expanded) {
+                    const padding = 20;
+                    const maxWidth = box.width - padding * 2;
+                    this.ctx.font = '15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                    const lines = this.wrapText(box.text, maxWidth);
+                    const lineHeight = 20;
+                    const startY = box.y + 30;
+                    
+                    this.ctx.textAlign = 'left';
+                    this.ctx.textBaseline = 'top';
+                    lines.forEach((line, i) => {
+                        this.ctx.fillText(
+                            line,
+                            box.x + padding,
+                            startY + i * lineHeight
+                        );
+                    });
+                } else {
+                    const padding = 20;
+                    const maxWidth = box.width - padding * 2;
+                    this.ctx.font = '15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                    const lines = this.wrapText(box.text, maxWidth);
+                    const lineHeight = 20;
+                    const maxLines = Math.floor((box.height - padding * 2) / lineHeight);
+                    const visibleLines = lines.slice(0, maxLines);
+                    const startY = box.y + padding;
+                    
+                    this.ctx.textAlign = 'left';
+                    this.ctx.textBaseline = 'top';
+                    visibleLines.forEach((line, i) => {
+                        let displayLine = line;
+                        if (i === maxLines - 1 && lines.length > maxLines) {
+                            while (displayLine.length > 0 && this.ctx.measureText(displayLine + '...').width > maxWidth) {
+                                displayLine = displayLine.slice(0, -1);
+                            }
+                            displayLine += '...';
+                        }
+                        this.ctx.fillText(
+                            displayLine,
+                            box.x + padding,
+                            startY + i * lineHeight
+                        );
+                    });
+                }
+                
+                this.ctx.restore();
+                
+                if (this.shouldShowExpandButton(box)) {
+                    const buttonRadius = 10;
+                    const buttonX = box.x + box.width - buttonRadius - 8;
+                    const buttonY = box.y + buttonRadius + 8;
+                    
+                    this.ctx.globalAlpha = 0.4;
+                    this.ctx.strokeStyle = '#5f6368';
+                    this.ctx.lineWidth = 1.2;
+                    this.ctx.lineCap = 'round';
+                    
+                    if (box.expanded) {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(buttonX - 3, buttonY);
+                        this.ctx.lineTo(buttonX + 3, buttonY);
+                        this.ctx.stroke();
+                    } else {
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(buttonX - 3, buttonY);
+                        this.ctx.lineTo(buttonX + 3, buttonY);
+                        this.ctx.stroke();
+                        
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(buttonX, buttonY - 3);
+                        this.ctx.lineTo(buttonX, buttonY + 3);
+                        this.ctx.stroke();
+                    }
+                    
+                    this.ctx.globalAlpha = 1.0;
+                }
+                
+            },
+            
+            drawArrow(arrow) {
+                const path = this.calculateArrowPath(arrow);
+                const isSelected = this.selectedArrow === arrow;
+                
+                this.ctx.strokeStyle = isSelected ? '#1a73e8' : '#5f6368';
+                this.ctx.lineWidth = isSelected ? 2.5 : 1.5;
+                this.ctx.lineCap = 'round';
+                this.ctx.lineJoin = 'round';
+                this.ctx.beginPath();
+                this.ctx.moveTo(path.x1, path.y1);
+                this.ctx.bezierCurveTo(path.cp1x, path.cp1y, path.cp2x, path.cp2y, path.x2, path.y2);
+                this.ctx.stroke();
+                
+                const t = 0.98;
+                const mt = 1 - t;
+                const beforeEndX = mt * mt * mt * path.x1 + 
+                                   3 * mt * mt * t * path.cp1x + 
+                                   3 * mt * t * t * path.cp2x + 
+                                   t * t * t * path.x2;
+                const beforeEndY = mt * mt * mt * path.y1 + 
+                                   3 * mt * mt * t * path.cp1y + 
+                                   3 * mt * t * t * path.cp2y + 
+                                   t * t * t * path.y2;
+                
+                const angle = Math.atan2(path.y2 - beforeEndY, path.x2 - beforeEndX);
+                const arrowLength = 8;
+                const arrowWidth = 0.35;
+                
+                this.ctx.fillStyle = isSelected ? '#1a73e8' : '#5f6368';
+                this.ctx.strokeStyle = isSelected ? '#1a73e8' : '#5f6368';
+                this.ctx.lineWidth = isSelected ? 2.5 : 1.5;
+                this.ctx.beginPath();
+                this.ctx.moveTo(path.x2, path.y2);
+                this.ctx.lineTo(
+                    path.x2 - arrowLength * Math.cos(angle - arrowWidth),
+                    path.y2 - arrowLength * Math.sin(angle - arrowWidth)
+                );
+                this.ctx.lineTo(
+                    path.x2 - arrowLength * Math.cos(angle + arrowWidth),
+                    path.y2 - arrowLength * Math.sin(angle + arrowWidth)
+                );
+                this.ctx.closePath();
+                this.ctx.fill();
+                this.ctx.stroke();
+            },
+            
+            deleteSelectedElement() {
+                if (this.selectedBox) {
+                    this.arrows = this.arrows.filter(arrow => 
+                        arrow.source !== this.selectedBox && arrow.target !== this.selectedBox
+                    );
+                    this.boxes = this.boxes.filter(box => box !== this.selectedBox);
+                    this.selectedBox = null;
+                } else if (this.selectedArrow) {
+                    this.arrows = this.arrows.filter(arrow => arrow !== this.selectedArrow);
+                    this.selectedArrow = null;
+                }
+                this.saveState();
+                this.render();
+            },
+            
+            saveState() {
+                const state = {
+                    boxes: this.boxes.map(box => ({
+                        id: box.id,
+                        x: box.x,
+                        y: box.y,
+                        width: box.width,
+                        height: box.height,
+                        defaultWidth: box.defaultWidth,
+                        defaultHeight: box.defaultHeight,
+                        text: box.text,
+                        expanded: box.expanded
+                    })),
+                    arrows: this.arrows.map(arrow => ({
+                        sourceId: arrow.source.id,
+                        targetId: arrow.target.id
+                    }))
+                };
+                localStorage.setItem('diagramState', JSON.stringify(state));
+            },
+            
+            loadState() {
+                const saved = localStorage.getItem('diagramState');
+                if (!saved) return;
+                
+                try {
+                    const state = JSON.parse(saved);
+                    
+                    this.boxes = state.boxes.map(box => ({
+                        ...box,
+                        selected: false,
+                        defaultWidth: box.defaultWidth || 150,
+                        defaultHeight: box.defaultHeight || 80,
+                        expanded: box.expanded || false
+                    }));
+                    
+                    const boxMap = new Map();
+                    this.boxes.forEach(box => boxMap.set(box.id, box));
+                    
+                    this.arrows = state.arrows
+                        .filter(arrow => boxMap.has(arrow.sourceId) && boxMap.has(arrow.targetId))
+                        .map(arrow => ({
+                            source: boxMap.get(arrow.sourceId),
+                            target: boxMap.get(arrow.targetId)
+                        }));
+                } catch (e) {
+                    console.error('Failed to load state:', e);
+                }
+            }
+        };
+        
+        window.addEventListener('load', () => app.init());
+    </script>
+</body>
+</html>
