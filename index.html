@@ -9,11 +9,18 @@
 <body>
     <div id="contextMenu">
         <button id="menuDelete" onclick="app.deleteSelectedElement()">Delete</button>
-        <button onclick="app.exportCanvasJSON()">Export Canvas (JSON)</button>
-        <button onclick="app.exportCanvasPNG()">Export Canvas (PNG)</button>
-        <button onclick="document.getElementById('importFile').click()">Import Canvas (JSON)</button>
+        <button id="menuTag" onclick="app.showTagMenu(event)">Tag</button>
+        <div id="tagMenu" style="display: none;">
+            <button onclick="app.setBoxTag(null); event.stopPropagation();">Remove Tag</button>
+            <div id="tagColors"></div>
+        </div>
+        <button id="menuExportJSON" onclick="app.exportCanvasJSON()">Export Canvas (JSON)</button>
+        <button id="menuExportPNG" onclick="app.exportCanvasPNG()">Export Canvas (PNG)</button>
+        <button id="menuImport" onclick="document.getElementById('importFile').click()">Import Canvas (JSON)</button>
     </div>
     <input id="importFile" type="file" accept="application/json,.json" style="display:none" />
+    
+    <div id="tagTooltip" style="position: fixed; display: none; background: rgba(0,0,0,0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 3000;"></div>
     
     <textarea id="textInput"></textarea>
     
@@ -31,6 +38,18 @@
             connectingTo: null,
             editingBox: null,
             dragging: false,
+            tagNames: {
+                '#ef4444': 'Red',
+                '#f59e0b': 'Orange',
+                '#10b981': 'Green',
+                '#3b82f6': 'Blue',
+                '#8b5cf6': 'Purple',
+                '#ec4899': 'Pink',
+                '#6366f1': 'Indigo',
+                '#06b6d4': 'Cyan'
+            },
+            hoveredTagBox: null,
+            tooltipTimeout: null,
             middleDragging: false,
             panningCanvas: false,
             resizingBox: null,
@@ -56,6 +75,12 @@
                     this.dragging = false;
                     this.connectingFrom = null;
                     this.connectingTo = null;
+                    this.hoveredTagBox = null;
+                    this.hideTagTooltip();
+                    if (this.tooltipTimeout) {
+                        clearTimeout(this.tooltipTimeout);
+                        this.tooltipTimeout = null;
+                    }
                 });
                 this.canvas.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
                 this.canvas.addEventListener('wheel', (e) => {
@@ -79,7 +104,8 @@
                 
                 document.addEventListener('click', (e) => {
                     const menu = document.getElementById('contextMenu');
-                    if (menu && !menu.contains(e.target)) {
+                    const tagMenu = document.getElementById('tagMenu');
+                    if (menu && !menu.contains(e.target) && (!tagMenu || !tagMenu.contains(e.target))) {
                         this.hideContextMenu();
                     }
                 });
@@ -114,6 +140,7 @@
                     }
                 });
                 
+                this.loadTagNames();
                 this.loadState();
                 this.render();
             },
@@ -179,7 +206,8 @@
                         defaultWidth: box.defaultWidth,
                         defaultHeight: box.defaultHeight,
                         text: box.text,
-                        expanded: !!box.expanded
+                        expanded: !!box.expanded,
+                        tag: box.tag || null
                     })),
                     arrows: this.arrows.map(a => ({
                         sourceId: a.source.id,
@@ -194,6 +222,10 @@
                 }
                 const idToBox = new Map();
                 this.boxes = state.boxes.map(b => {
+                    let tag = b.tag || null;
+                    if (!tag && b.tagColor) {
+                        tag = { color: b.tagColor, name: '' };
+                    }
                     const box = {
                         id: b.id || (Date.now() + Math.random()),
                         x: b.x,
@@ -203,7 +235,8 @@
                         defaultWidth: b.defaultWidth ?? b.width,
                         defaultHeight: b.defaultHeight ?? b.height,
                         text: b.text || '',
-                        expanded: !!b.expanded
+                        expanded: !!b.expanded,
+                        tag: tag
                     };
                     idToBox.set(box.id, box);
                     return box;
@@ -255,7 +288,8 @@
                     defaultHeight: 80,
                     text: '',
                     selected: false,
-                    expanded: false
+                    expanded: false,
+                    tag: null
                 };
                 this.boxes.push(box);
                 this.saveState();
@@ -762,6 +796,49 @@
                 const pos = this.getMousePos(e);
                 this.lastMousePos = pos;
                 
+                const dotRadius = 6;
+                const tolerance = 8;
+                let foundHover = false;
+                
+                if (!this.resizingBox && !this.dragging && !this.middleDragging && !this.panningCanvas) {
+                    for (const box of this.boxes) {
+                        if (box.tag && box.tag.color) {
+                            const dotX = box.x + dotRadius + 8;
+                            const dotY = box.y + dotRadius + 8;
+                            const distance = Math.sqrt((pos.x - dotX) ** 2 + (pos.y - dotY) ** 2);
+                            
+                            if (distance <= dotRadius + tolerance) {
+                                if (this.hoveredTagBox !== box) {
+                                    this.hoveredTagBox = box;
+                                    if (this.tooltipTimeout) {
+                                        clearTimeout(this.tooltipTimeout);
+                                    }
+                                    this.tooltipTimeout = setTimeout(() => {
+                                        this.showTagTooltip(e.clientX, e.clientY, box);
+                                    }, 300);
+                                } else {
+                                    const tooltip = document.getElementById('tagTooltip');
+                                    if (tooltip && tooltip.style.display !== 'none') {
+                                        tooltip.style.left = (e.clientX + 10) + 'px';
+                                        tooltip.style.top = (e.clientY + 10) + 'px';
+                                    }
+                                }
+                                foundHover = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (!foundHover && this.hoveredTagBox) {
+                        this.hoveredTagBox = null;
+                        this.hideTagTooltip();
+                        if (this.tooltipTimeout) {
+                            clearTimeout(this.tooltipTimeout);
+                            this.tooltipTimeout = null;
+                        }
+                    }
+                }
+                
                 if (this.resizingBox) {
                     const minSize = 50;
                     if (this.resizeHandle === 'se') {
@@ -860,6 +937,9 @@
                 const box = this.findBoxAt(pos.x, pos.y);
                 
                 if (box) {
+                    if (this.isExpandButtonAt(pos.x, pos.y, box)) {
+                        return;
+                    }
                     this.startEditing(box, pos.x, pos.y);
                 } else {
                     this.createBox(pos.x, pos.y);
@@ -894,13 +974,155 @@
             showContextMenu(x, y) {
                 const menu = document.getElementById('contextMenu');
                 const del = document.getElementById('menuDelete');
+                const tagBtn = document.getElementById('menuTag');
+                const tagMenu = document.getElementById('tagMenu');
+                const exportJSON = document.getElementById('menuExportJSON');
+                const exportPNG = document.getElementById('menuExportPNG');
+                const importBtn = document.getElementById('menuImport');
+                
+                const hasSelection = !!(this.selectedBox || this.selectedArrow);
+                
                 if (del) {
-                    const hasSelection = !!(this.selectedBox || this.selectedArrow);
                     del.style.display = hasSelection ? 'block' : 'none';
                 }
+                
+                if (tagBtn) {
+                    tagBtn.style.display = this.selectedBox ? 'block' : 'none';
+                }
+                
+                if (exportJSON) {
+                    exportJSON.style.display = hasSelection ? 'none' : 'block';
+                }
+                
+                if (exportPNG) {
+                    exportPNG.style.display = hasSelection ? 'none' : 'block';
+                }
+                
+                if (importBtn) {
+                    importBtn.style.display = hasSelection ? 'none' : 'block';
+                }
+                
+                if (tagMenu) {
+                    tagMenu.style.display = 'none';
+                }
+                
                 menu.style.display = 'block';
                 menu.style.left = x + 'px';
                 menu.style.top = y + 'px';
+            },
+            
+            showTagMenu(e) {
+                if (e) {
+                    e.stopPropagation();
+                }
+                const tagMenu = document.getElementById('tagMenu');
+                const tagColors = document.getElementById('tagColors');
+                if (!tagMenu || !tagColors) return;
+                
+                if (tagMenu.style.display === 'none' || !tagMenu.style.display) {
+                    tagColors.innerHTML = '';
+                    Object.keys(this.tagNames).forEach(color => {
+                        const container = document.createElement('div');
+                        container.style.display = 'flex';
+                        container.style.alignItems = 'center';
+                        container.style.gap = '8px';
+                        container.style.padding = '2px 0';
+                        
+                        const btn = document.createElement('button');
+                        btn.style.flex = '1';
+                        btn.style.display = 'flex';
+                        btn.style.alignItems = 'center';
+                        btn.style.gap = '8px';
+                        const currentTag = this.selectedBox && this.selectedBox.tag;
+                        const isSelected = currentTag && currentTag.color === color;
+                        const tagName = this.tagNames[color] || color;
+                        
+                        const dotSpan = document.createElement('span');
+                        dotSpan.style.display = 'inline-block';
+                        dotSpan.style.width = '12px';
+                        dotSpan.style.height = '12px';
+                        dotSpan.style.borderRadius = '50%';
+                        dotSpan.style.background = color;
+                        dotSpan.style.border = '1px solid rgba(0,0,0,0.1)';
+                        
+                        const nameSpan = document.createElement('span');
+                        nameSpan.textContent = tagName;
+                        nameSpan.style.flex = '1';
+                        
+                        if (isSelected) {
+                            btn.style.fontWeight = 'bold';
+                        }
+                        btn.onclick = (ev) => {
+                            ev.stopPropagation();
+                            this.setBoxTag(color);
+                        };
+                        
+                        btn.appendChild(dotSpan);
+                        btn.appendChild(nameSpan);
+                        container.appendChild(btn);
+                        tagColors.appendChild(container);
+                    });
+                    tagMenu.style.display = 'block';
+                } else {
+                    tagMenu.style.display = 'none';
+                }
+            },
+            
+            setBoxTag(color) {
+                if (!this.selectedBox) return;
+                if (color === null) {
+                    this.selectedBox.tag = null;
+                } else {
+                    const existingTag = this.selectedBox.tag;
+                    const defaultName = this.tagNames[color] || '';
+                    this.selectedBox.tag = {
+                        color: color,
+                        name: existingTag && existingTag.color === color ? existingTag.name : defaultName
+                    };
+                }
+                const tagMenu = document.getElementById('tagMenu');
+                if (tagMenu) {
+                    tagMenu.style.display = 'none';
+                }
+                this.saveState();
+                this.render();
+                this.hideContextMenu();
+            },
+            
+            
+            showTagTooltip(x, y, box) {
+                if (!box.tag || !box.tag.color) return;
+                const tooltip = document.getElementById('tagTooltip');
+                if (!tooltip) return;
+                const tagName = box.tag.name || this.tagNames[box.tag.color] || box.tag.color;
+                tooltip.textContent = tagName;
+                if (tooltip.style.display === 'none') {
+                    tooltip.style.display = 'block';
+                }
+                tooltip.style.left = (x + 10) + 'px';
+                tooltip.style.top = (y + 10) + 'px';
+            },
+            
+            hideTagTooltip() {
+                const tooltip = document.getElementById('tagTooltip');
+                if (tooltip) {
+                    tooltip.style.display = 'none';
+                }
+            },
+            
+            saveTagNames() {
+                localStorage.setItem('tagNames', JSON.stringify(this.tagNames));
+            },
+            
+            loadTagNames() {
+                const saved = localStorage.getItem('tagNames');
+                if (saved) {
+                    try {
+                        const names = JSON.parse(saved);
+                        this.tagNames = { ...this.tagNames, ...names };
+                    } catch (e) {
+                    }
+                }
             },
             
             hideContextMenu() {
@@ -1104,6 +1326,23 @@
                 
                 this.ctx.restore();
                 
+                if (box.tag && box.tag.color) {
+                    const dotRadius = 6;
+                    const dotX = box.x + dotRadius + 8;
+                    const dotY = box.y + dotRadius + 8;
+                    
+                    this.ctx.save();
+                    this.ctx.beginPath();
+                    this.ctx.arc(dotX, dotY, dotRadius, 0, Math.PI * 2);
+                    this.ctx.fillStyle = box.tag.color;
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#ffffff';
+                    this.ctx.lineWidth = 1.5;
+                    this.ctx.stroke();
+                    
+                    this.ctx.restore();
+                }
+                
                 if (this.shouldShowExpandButton(box)) {
                     const buttonRadius = 10;
                     const buttonX = box.x + box.width - buttonRadius - 8;
@@ -1195,6 +1434,7 @@
                 }
                 this.saveState();
                 this.render();
+                this.hideContextMenu();
             },
             
             saveState() {
@@ -1208,7 +1448,8 @@
                         defaultWidth: box.defaultWidth,
                         defaultHeight: box.defaultHeight,
                         text: box.text,
-                        expanded: box.expanded
+                        expanded: box.expanded,
+                        tag: box.tag || null
                     })),
                     arrows: this.arrows.map(arrow => ({
                         sourceId: arrow.source.id,
@@ -1225,13 +1466,20 @@
                 try {
                     const state = JSON.parse(saved);
                     
-                    this.boxes = state.boxes.map(box => ({
-                        ...box,
-                        selected: false,
-                        defaultWidth: box.defaultWidth || 150,
-                        defaultHeight: box.defaultHeight || 80,
-                        expanded: box.expanded || false
-                    }));
+                    this.boxes = state.boxes.map(box => {
+                        let tag = box.tag || null;
+                        if (!tag && box.tagColor) {
+                            tag = { color: box.tagColor, name: '' };
+                        }
+                        return {
+                            ...box,
+                            selected: false,
+                            defaultWidth: box.defaultWidth || 150,
+                            defaultHeight: box.defaultHeight || 80,
+                            expanded: box.expanded || false,
+                            tag: tag
+                        };
+                    });
                     
                     const boxMap = new Map();
                     this.boxes.forEach(box => boxMap.set(box.id, box));

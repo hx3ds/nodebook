@@ -65,6 +65,24 @@ body {
     transform: scale(0.98);
 }
 
+#tagMenu {
+    margin-top: 4px;
+    padding: 4px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+#tagColors {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+#tagColors button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 #textInput {
     position: fixed;
     padding: 20px;
