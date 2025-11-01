@@ -100,3 +100,170 @@ body {
     line-height: 20px;
 }
 
+#exportModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 4000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#exportModalOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+#exportModalContent {
+    position: relative;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    width: 90%;
+    max-width: 400px;
+    padding: 0;
+    overflow: hidden;
+}
+
+#exportModalHeader {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+#exportModalTitle {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1f1f1f;
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+#exportModalBody {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+#exportModalBody label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #5f6368;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+#exportModalBody input {
+    padding: 8px 12px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #1f1f1f;
+    outline: none;
+    transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+    background: #ffffff;
+}
+
+#exportModalBody input:focus {
+    border-color: #1a73e8;
+    box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
+}
+
+#exportModalBody input::placeholder {
+    color: #9aa0a6;
+}
+
+#exportModalBody input[readonly] {
+    background: #f8f9fa;
+    cursor: default;
+}
+
+#exportDirectoryContainer {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+#exportDirectoryContainer input {
+    flex: 1;
+}
+
+#exportSelectDirectory {
+    padding: 8px 16px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #ffffff;
+    color: #1f1f1f;
+    transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+}
+
+#exportSelectDirectory:hover {
+    background: rgba(26, 115, 232, 0.08);
+    border-color: #1a73e8;
+    color: #1a73e8;
+}
+
+#exportSelectDirectory:active {
+    transform: scale(0.98);
+}
+
+#exportModalFooter {
+    padding: 12px 20px;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+#exportModalFooter button {
+    padding: 6px 16px;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+}
+
+#exportModalCancel {
+    background: none;
+    color: #5f6368;
+}
+
+#exportModalCancel:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+#exportModalConfirm {
+    background: #1a73e8;
+    color: #ffffff;
+}
+
+#exportModalConfirm:hover {
+    background: #1557b0;
+}
+
+#exportModalConfirm:active,
+#exportModalCancel:active {
+    transform: scale(0.98);
+}
+

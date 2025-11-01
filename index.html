@@ -14,6 +14,11 @@
             <button onclick="app.setBoxTag(null); event.stopPropagation();">Remove Tag</button>
             <div id="tagColors"></div>
         </div>
+        <button id="menuArrowColor" onclick="app.showArrowColorMenu(event)">Color</button>
+        <div id="arrowColorMenu" style="display: none;">
+            <button onclick="app.setArrowColor(null); event.stopPropagation();">Default</button>
+            <div id="arrowColors"></div>
+        </div>
         <button id="menuExportJSON" onclick="app.exportCanvasJSON()">Export Canvas (JSON)</button>
         <button id="menuExportPNG" onclick="app.exportCanvasPNG()">Export Canvas (PNG)</button>
         <button id="menuImport" onclick="document.getElementById('importFile').click()">Import Canvas (JSON)</button>
@@ -21,6 +26,28 @@
     <input id="importFile" type="file" accept="application/json,.json" style="display:none" />
     
     <div id="tagTooltip" style="position: fixed; display: none; background: rgba(0,0,0,0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 3000;"></div>
+    
+    <div id="exportModal" style="display: none;">
+        <div id="exportModalOverlay"></div>
+        <div id="exportModalContent">
+            <div id="exportModalHeader">
+                <h3 id="exportModalTitle">Export File</h3>
+            </div>
+            <div id="exportModalBody">
+                <label for="exportFileName">Filename:</label>
+                <input type="text" id="exportFileName" placeholder="Enter filename">
+                <label for="exportFileDirectory">Directory:</label>
+                <div id="exportDirectoryContainer">
+                    <input type="text" id="exportFileDirectory" placeholder="No directory selected" readonly>
+                    <button id="exportSelectDirectory">Select Directory</button>
+                </div>
+            </div>
+            <div id="exportModalFooter">
+                <button id="exportModalCancel">Cancel</button>
+                <button id="exportModalConfirm">Export</button>
+            </div>
+        </div>
+    </div>
     
     <textarea id="textInput"></textarea>
     
@@ -59,6 +86,8 @@
             lastMousePos: { x: 0, y: 0 },
             lastPanPos: { x: 0, y: 0 },
             dpr: 1,
+            pendingExportType: null,
+            selectedDirectoryHandle: null,
             
             init() {
                 this.canvas = document.getElementById('canvas');
@@ -105,7 +134,8 @@
                 document.addEventListener('click', (e) => {
                     const menu = document.getElementById('contextMenu');
                     const tagMenu = document.getElementById('tagMenu');
-                    if (menu && !menu.contains(e.target) && (!tagMenu || !tagMenu.contains(e.target))) {
+                    const arrowColorMenu = document.getElementById('arrowColorMenu');
+                    if (menu && !menu.contains(e.target) && (!tagMenu || !tagMenu.contains(e.target)) && (!arrowColorMenu || !arrowColorMenu.contains(e.target))) {
                         this.hideContextMenu();
                     }
                 });
@@ -140,26 +170,184 @@
                     }
                 });
                 
+                const exportModal = document.getElementById('exportModal');
+                const exportModalCancel = document.getElementById('exportModalCancel');
+                const exportModalConfirm = document.getElementById('exportModalConfirm');
+                const exportFileName = document.getElementById('exportFileName');
+                const exportModalOverlay = document.getElementById('exportModalOverlay');
+                const exportSelectDirectory = document.getElementById('exportSelectDirectory');
+                
+                exportModalCancel.addEventListener('click', () => this.hideExportModal());
+                exportModalConfirm.addEventListener('click', () => this.confirmExport());
+                exportModalOverlay.addEventListener('click', () => this.hideExportModal());
+                exportSelectDirectory.addEventListener('click', () => this.selectDirectory());
+                
+                exportFileName.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.confirmExport();
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        this.hideExportModal();
+                    }
+                });
+                
                 this.loadTagNames();
                 this.loadState();
                 this.render();
             },
             
-            exportCanvasJSON() {
+            async selectDirectory() {
+                if (!window.showDirectoryPicker) {
+                    alert('Directory selection is not supported in your browser. Please use a modern browser like Chrome, Edge, or Opera.');
+                    return;
+                }
+                
+                try {
+                    const handle = await window.showDirectoryPicker();
+                    this.selectedDirectoryHandle = handle;
+                    const exportFileDirectory = document.getElementById('exportFileDirectory');
+                    exportFileDirectory.value = handle.name;
+                } catch (e) {
+                    if (e.name !== 'AbortError') {
+                        console.error('Error selecting directory:', e);
+                    }
+                }
+            },
+            
+            showExportModal(type, defaultExtension) {
+                this.pendingExportType = type;
+                this.selectedDirectoryHandle = null;
+                const exportModal = document.getElementById('exportModal');
+                const exportFileName = document.getElementById('exportFileName');
+                const exportFileDirectory = document.getElementById('exportFileDirectory');
+                const exportModalTitle = document.getElementById('exportModalTitle');
+                const exportSelectDirectory = document.getElementById('exportSelectDirectory');
+                
+                const ts = new Date().toISOString().replace(/[:.]/g, '-');
+                const defaultName = `canvas-${ts}`;
+                
+                exportModalTitle.textContent = type === 'json' ? 'Export Canvas (JSON)' : 'Export Canvas (PNG)';
+                exportFileName.value = defaultName;
+                exportFileDirectory.value = '';
+                
+                if (!window.showDirectoryPicker) {
+                    exportSelectDirectory.style.display = 'none';
+                } else {
+                    exportSelectDirectory.style.display = 'block';
+                }
+                
+                exportModal.style.display = 'flex';
+                
+                setTimeout(() => {
+                    exportFileName.focus();
+                    exportFileName.select();
+                }, 100);
+            },
+            
+            hideExportModal() {
+                const exportModal = document.getElementById('exportModal');
+                exportModal.style.display = 'none';
+                this.pendingExportType = null;
+                this.selectedDirectoryHandle = null;
+                const exportFileDirectory = document.getElementById('exportFileDirectory');
+                if (exportFileDirectory) {
+                    exportFileDirectory.value = '';
+                }
+            },
+            
+            async confirmExport() {
+                if (!this.pendingExportType) return;
+                
+                const exportFileName = document.getElementById('exportFileName');
+                const fileName = exportFileName.value.trim();
+                
+                if (!fileName) {
+                    exportFileName.focus();
+                    return;
+                }
+                
+                const extension = this.pendingExportType === 'json' ? '.json' : '.png';
+                const finalName = fileName.replace(new RegExp(`\\.${extension.slice(1)}$`, 'i'), '') + extension;
+                
+                if (this.selectedDirectoryHandle) {
+                    if (this.pendingExportType === 'json') {
+                        await this.performJSONExportToDirectory(finalName);
+                    } else {
+                        await this.performPNGExportToDirectory(finalName);
+                    }
+                } else {
+                    if (this.pendingExportType === 'json') {
+                        this.performJSONExport(finalName);
+                    } else {
+                        this.performPNGExport(finalName);
+                    }
+                }
+                
+                this.hideExportModal();
+            },
+            
+            async performJSONExportToDirectory(fileName) {
+                try {
+                    const state = this.serializeState();
+                    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+                    const fileHandle = await this.selectedDirectoryHandle.getFileHandle(fileName, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                } catch (e) {
+                    console.error('Error writing file to directory:', e);
+                    alert('Failed to save file to selected directory. Falling back to download.');
+                    this.performJSONExport(fileName);
+                }
+            },
+            
+            performJSONExport(fileName) {
                 const state = this.serializeState();
                 const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                const ts = new Date().toISOString().replace(/[:.]/g, '-');
                 a.href = url;
-                a.download = `canvas-${ts}.json`;
+                a.download = fileName;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             },
             
-            exportCanvasPNG() {
+            exportCanvasJSON() {
+                this.showExportModal('json', '.json');
+            },
+            
+            async performPNGExportToDirectory(fileName) {
+                try {
+                    const off = document.createElement('canvas');
+                    off.width = this.canvas.width;
+                    off.height = this.canvas.height;
+                    const octx = off.getContext('2d');
+                    octx.fillStyle = '#ffffff';
+                    octx.fillRect(0, 0, off.width, off.height);
+                    octx.drawImage(this.canvas, 0, 0);
+                    
+                    const blob = await new Promise((resolve, reject) => {
+                        off.toBlob((blob) => {
+                            if (blob) resolve(blob);
+                            else reject(new Error('Failed to create blob'));
+                        }, 'image/png');
+                    });
+                    
+                    const fileHandle = await this.selectedDirectoryHandle.getFileHandle(fileName, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                } catch (e) {
+                    console.error('Error writing file to directory:', e);
+                    alert('Failed to save file to selected directory. Falling back to download.');
+                    this.performPNGExport(fileName);
+                }
+            },
+            
+            performPNGExport(fileName) {
                 const off = document.createElement('canvas');
                 off.width = this.canvas.width;
                 off.height = this.canvas.height;
@@ -171,14 +359,17 @@
                     if (!blob) return;
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    const ts = new Date().toISOString().replace(/[:.]/g, '-');
                     a.href = url;
-                    a.download = `canvas-${ts}.png`;
+                    a.download = fileName;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
                 }, 'image/png');
+            },
+            
+            exportCanvasPNG() {
+                this.showExportModal('png', '.png');
             },
             
             importFromFile(file) {
@@ -189,8 +380,12 @@
                         this.loadFromState(data);
                         this.saveState();
                         this.render();
-                    } catch (_) {
+                    } catch (e) {
+                        console.error('Failed to import file:', e);
                     }
+                };
+                reader.onerror = () => {
+                    console.error('Failed to read file');
                 };
                 reader.readAsText(file);
             },
@@ -205,20 +400,27 @@
                         height: box.height,
                         defaultWidth: box.defaultWidth,
                         defaultHeight: box.defaultHeight,
-                        text: box.text,
+                        text: box.text || '',
                         expanded: !!box.expanded,
                         tag: box.tag || null
                     })),
                     arrows: this.arrows.map(a => ({
                         sourceId: a.source.id,
-                        targetId: a.target.id
+                        targetId: a.target.id,
+                        color: a.color || null
                     }))
                 };
             },
             
             loadFromState(state) {
-                if (!state || !Array.isArray(state.boxes) || !Array.isArray(state.arrows)) {
+                if (!state) {
                     return;
+                }
+                if (!Array.isArray(state.boxes)) {
+                    state.boxes = [];
+                }
+                if (!Array.isArray(state.arrows)) {
+                    state.arrows = [];
                 }
                 const idToBox = new Map();
                 this.boxes = state.boxes.map(b => {
@@ -228,12 +430,12 @@
                     }
                     const box = {
                         id: b.id || (Date.now() + Math.random()),
-                        x: b.x,
-                        y: b.y,
-                        width: b.width,
-                        height: b.height,
-                        defaultWidth: b.defaultWidth ?? b.width,
-                        defaultHeight: b.defaultHeight ?? b.height,
+                        x: b.x || 0,
+                        y: b.y || 0,
+                        width: b.width || 150,
+                        height: b.height || 80,
+                        defaultWidth: b.defaultWidth ?? b.width ?? 150,
+                        defaultHeight: b.defaultHeight ?? b.height ?? 80,
                         text: b.text || '',
                         expanded: !!b.expanded,
                         tag: tag
@@ -243,10 +445,17 @@
                 });
                 this.arrows = state.arrows
                     .map(a => {
+                        if (!a || !a.sourceId || !a.targetId) {
+                            return null;
+                        }
                         const source = idToBox.get(a.sourceId);
                         const target = idToBox.get(a.targetId);
                         if (source && target && source !== target) {
-                            return { source, target };
+                            return { 
+                                source, 
+                                target, 
+                                color: a.color || null 
+                            };
                         }
                         return null;
                     })
@@ -632,7 +841,7 @@
                     }
                 }
                 
-                this.arrows.push({ source, target });
+                this.arrows.push({ source, target, color: null });
                 this.saveState();
                 this.render();
             },
@@ -976,6 +1185,8 @@
                 const del = document.getElementById('menuDelete');
                 const tagBtn = document.getElementById('menuTag');
                 const tagMenu = document.getElementById('tagMenu');
+                const arrowColorBtn = document.getElementById('menuArrowColor');
+                const arrowColorMenu = document.getElementById('arrowColorMenu');
                 const exportJSON = document.getElementById('menuExportJSON');
                 const exportPNG = document.getElementById('menuExportPNG');
                 const importBtn = document.getElementById('menuImport');
@@ -988,6 +1199,10 @@
                 
                 if (tagBtn) {
                     tagBtn.style.display = this.selectedBox ? 'block' : 'none';
+                }
+                
+                if (arrowColorBtn) {
+                    arrowColorBtn.style.display = this.selectedArrow ? 'block' : 'none';
                 }
                 
                 if (exportJSON) {
@@ -1004,6 +1219,10 @@
                 
                 if (tagMenu) {
                     tagMenu.style.display = 'none';
+                }
+                
+                if (arrowColorMenu) {
+                    arrowColorMenu.style.display = 'none';
                 }
                 
                 menu.style.display = 'block';
@@ -1089,6 +1308,75 @@
                 this.hideContextMenu();
             },
             
+            showArrowColorMenu(e) {
+                if (e) {
+                    e.stopPropagation();
+                }
+                const arrowColorMenu = document.getElementById('arrowColorMenu');
+                const arrowColors = document.getElementById('arrowColors');
+                if (!arrowColorMenu || !arrowColors) return;
+                
+                if (arrowColorMenu.style.display === 'none' || !arrowColorMenu.style.display) {
+                    arrowColors.innerHTML = '';
+                    Object.keys(this.tagNames).forEach(color => {
+                        const container = document.createElement('div');
+                        container.style.display = 'flex';
+                        container.style.alignItems = 'center';
+                        container.style.gap = '8px';
+                        container.style.padding = '2px 0';
+                        
+                        const btn = document.createElement('button');
+                        btn.style.flex = '1';
+                        btn.style.display = 'flex';
+                        btn.style.alignItems = 'center';
+                        btn.style.gap = '8px';
+                        const currentColor = this.selectedArrow && this.selectedArrow.color;
+                        const isSelected = currentColor === color;
+                        const colorName = this.tagNames[color] || color;
+                        
+                        const dotSpan = document.createElement('span');
+                        dotSpan.style.display = 'inline-block';
+                        dotSpan.style.width = '12px';
+                        dotSpan.style.height = '12px';
+                        dotSpan.style.borderRadius = '50%';
+                        dotSpan.style.background = color;
+                        dotSpan.style.border = '1px solid rgba(0,0,0,0.1)';
+                        
+                        const nameSpan = document.createElement('span');
+                        nameSpan.textContent = colorName;
+                        nameSpan.style.flex = '1';
+                        
+                        if (isSelected) {
+                            btn.style.fontWeight = 'bold';
+                        }
+                        btn.onclick = (ev) => {
+                            ev.stopPropagation();
+                            this.setArrowColor(color);
+                        };
+                        
+                        btn.appendChild(dotSpan);
+                        btn.appendChild(nameSpan);
+                        container.appendChild(btn);
+                        arrowColors.appendChild(container);
+                    });
+                    arrowColorMenu.style.display = 'block';
+                } else {
+                    arrowColorMenu.style.display = 'none';
+                }
+            },
+            
+            setArrowColor(color) {
+                if (!this.selectedArrow) return;
+                this.selectedArrow.color = color;
+                const arrowColorMenu = document.getElementById('arrowColorMenu');
+                if (arrowColorMenu) {
+                    arrowColorMenu.style.display = 'none';
+                }
+                this.saveState();
+                this.render();
+                this.hideContextMenu();
+            },
+            
             
             showTagTooltip(x, y, box) {
                 if (!box.tag || !box.tag.color) return;
@@ -1134,6 +1422,14 @@
             
             handleKeyDown(e) {
                 if (this.editingBox) {
+                    return;
+                }
+                
+                const exportModal = document.getElementById('exportModal');
+                if (exportModal && exportModal.style.display !== 'none') {
+                    if (e.key === 'Escape') {
+                        this.hideExportModal();
+                    }
                     return;
                 }
                 
@@ -1378,8 +1674,9 @@
             drawArrow(arrow) {
                 const path = this.calculateArrowPath(arrow);
                 const isSelected = this.selectedArrow === arrow;
+                const arrowColor = arrow.color || (isSelected ? '#1a73e8' : '#5f6368');
                 
-                this.ctx.strokeStyle = isSelected ? '#1a73e8' : '#5f6368';
+                this.ctx.strokeStyle = arrowColor;
                 this.ctx.lineWidth = isSelected ? 2.5 : 1.5;
                 this.ctx.lineCap = 'round';
                 this.ctx.lineJoin = 'round';
@@ -1403,8 +1700,8 @@
                 const arrowLength = 8;
                 const arrowWidth = 0.35;
                 
-                this.ctx.fillStyle = isSelected ? '#1a73e8' : '#5f6368';
-                this.ctx.strokeStyle = isSelected ? '#1a73e8' : '#5f6368';
+                this.ctx.fillStyle = arrowColor;
+                this.ctx.strokeStyle = arrowColor;
                 this.ctx.lineWidth = isSelected ? 2.5 : 1.5;
                 this.ctx.beginPath();
                 this.ctx.moveTo(path.x2, path.y2);
@@ -1447,16 +1744,21 @@
                         height: box.height,
                         defaultWidth: box.defaultWidth,
                         defaultHeight: box.defaultHeight,
-                        text: box.text,
-                        expanded: box.expanded,
+                        text: box.text || '',
+                        expanded: !!box.expanded,
                         tag: box.tag || null
                     })),
                     arrows: this.arrows.map(arrow => ({
                         sourceId: arrow.source.id,
-                        targetId: arrow.target.id
+                        targetId: arrow.target.id,
+                        color: arrow.color || null
                     }))
                 };
-                localStorage.setItem('diagramState', JSON.stringify(state));
+                try {
+                    localStorage.setItem('diagramState', JSON.stringify(state));
+                } catch (e) {
+                    console.error('Failed to save state:', e);
+                }
             },
             
             loadState() {
@@ -1465,31 +1767,7 @@
                 
                 try {
                     const state = JSON.parse(saved);
-                    
-                    this.boxes = state.boxes.map(box => {
-                        let tag = box.tag || null;
-                        if (!tag && box.tagColor) {
-                            tag = { color: box.tagColor, name: '' };
-                        }
-                        return {
-                            ...box,
-                            selected: false,
-                            defaultWidth: box.defaultWidth || 150,
-                            defaultHeight: box.defaultHeight || 80,
-                            expanded: box.expanded || false,
-                            tag: tag
-                        };
-                    });
-                    
-                    const boxMap = new Map();
-                    this.boxes.forEach(box => boxMap.set(box.id, box));
-                    
-                    this.arrows = state.arrows
-                        .filter(arrow => boxMap.has(arrow.sourceId) && boxMap.has(arrow.targetId))
-                        .map(arrow => ({
-                            source: boxMap.get(arrow.sourceId),
-                            target: boxMap.get(arrow.targetId)
-                        }));
+                    this.loadFromState(state);
                 } catch (e) {
                     console.error('Failed to load state:', e);
                 }
