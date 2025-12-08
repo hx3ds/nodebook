@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Box Diagram</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/room.css">
+    <link rel="stylesheet" href="css/sidebar.css">
+    <link rel="stylesheet" href="css/projection.css">
+    <link rel="stylesheet" href="css/panel.css">
+    <link rel="stylesheet" href="css/controls.css">
+    <link rel="stylesheet" href="css/modals.css">
+</head>
+<body>
+    <!-- File Explorer Sidebar -->
+    <div id="sidebar">
+        <div id="sidebarHeader">
+            <div id="sidebarTitle">EXPLORER</div>
+            <div id="sidebarActions">
+                <button id="openFolderBtn" title="Open Folder">📁</button>
+                <button id="newFileBtn" title="New Note">📄</button>
+                <button id="newFolderBtn" title="New Folder">📂</button>
+            </div>
+        </div>
+        <div id="fileTree"></div>
+        <div id="sidebarFooter">
+            <div id="currentFolderPath"></div>
+        </div>
+    </div>
+    
+    <!-- Resize handle -->
+    <div id="sidebarResizer"></div>
+    
+    <!-- Box Context Menu -->
+    <div id="boxContextMenu">
+        <button id="boxMenuCopy" onclick="room.copy()">Copy <span class="menu-shortcut">Ctrl+C</span></button>
+        <button id="boxMenuCut" onclick="room.cut()">Cut <span class="menu-shortcut">Ctrl+X</span></button>
+        <div class="menu-divider"></div>
+        <button id="boxMenuDelete" onclick="room.deleteSelectedElement()">Delete <span class="menu-shortcut">Del</span></button>
+        
+        <div class="menu-divider"></div>
+        <div class="menu-item-with-submenu" id="boxMenuTagContainer">
+            <button id="boxMenuTag">Tag ›</button>
+            <div class="submenu" id="boxTagMenu">
+                <button onclick="room.setBoxTag(room.selectedBox, null)">Remove Tag</button>
+                <div class="submenu-divider"></div>
+                <div id="tagColors">
+                    <button data-color="#ef4444" onclick="room.setBoxTag(room.selectedBox, '#ef4444')">
+                        <span class="tag-dot-menu" style="background: #ef4444;"></span>
+                        <span>Red</span>
+                    </button>
+                    <button data-color="#f59e0b" onclick="room.setBoxTag(room.selectedBox, '#f59e0b')">
+                        <span class="tag-dot-menu" style="background: #f59e0b;"></span>
+                        <span>Orange</span>
+                    </button>
+                    <button data-color="#10b981" onclick="room.setBoxTag(room.selectedBox, '#10b981')">
+                        <span class="tag-dot-menu" style="background: #10b981;"></span>
+                        <span>Green</span>
+                    </button>
+                    <button data-color="#3b82f6" onclick="room.setBoxTag(room.selectedBox, '#3b82f6')">
+                        <span class="tag-dot-menu" style="background: #3b82f6;"></span>
+                        <span>Blue</span>
+                    </button>
+                    <button data-color="#8b5cf6" onclick="room.setBoxTag(room.selectedBox, '#8b5cf6')">
+                        <span class="tag-dot-menu" style="background: #8b5cf6;"></span>
+                        <span>Purple</span>
+                    </button>
+                    <button data-color="#ec4899" onclick="room.setBoxTag(room.selectedBox, '#ec4899')">
+                        <span class="tag-dot-menu" style="background: #ec4899;"></span>
+                        <span>Pink</span>
+                    </button>
+                    <button data-color="#6366f1" onclick="room.setBoxTag(room.selectedBox, '#6366f1')">
+                        <span class="tag-dot-menu" style="background: #6366f1;"></span>
+                        <span>Indigo</span>
+                    </button>
+                    <button data-color="#06b6d4" onclick="room.setBoxTag(room.selectedBox, '#06b6d4')">
+                        <span class="tag-dot-menu" style="background: #06b6d4;"></span>
+                        <span>Cyan</span>
+                    </button>
+                </div>
+                <div class="submenu-divider"></div>
+                <button onclick="room.addCustomBoxTag(room.selectedBox)">🎨 Custom Tag...</button>
+            </div>
+        </div>
+        
+        <div class="menu-item-with-submenu" id="boxMenuTypeContainer">
+            <button id="boxMenuType">Type ›</button>
+            <div class="submenu" id="boxTypeMenu">
+                <button id="boxTypeTextBtn" onclick="room.setBoxType(room.selectedBox, 'text')">📝 Text Box</button>
+                <button id="boxTypeMarkdownBtn" onclick="room.setBoxType(room.selectedBox, 'markdown')">📄 Markdown Box</button>
+                <button id="boxTypeBookBtn" onclick="room.setBoxAsBookLink(room.selectedBox, explorer)">📖 Book Link</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Arrow Context Menu -->
+    <div id="arrowContextMenu">
+        <button id="arrowMenuDelete" onclick="room.deleteSelectedElement()">Delete <span class="menu-shortcut">Del</span></button>
+        <div class="menu-divider"></div>
+        <div class="menu-item-with-submenu" id="arrowMenuTagContainer">
+            <button id="arrowMenuTag">Tag ›</button>
+            <div class="submenu" id="arrowTagMenu">
+                <button onclick="room.setArrowTag(room.selectedArrow, null)">Default</button>
+                <div class="submenu-divider"></div>
+                <div id="arrowTagColors">
+                    <button data-color="#ef4444" onclick="room.setArrowTag(room.selectedArrow, '#ef4444')">
+                        <span class="tag-dot-menu" style="background: #ef4444;"></span>
+                        <span>Red</span>
+                    </button>
+                    <button data-color="#f59e0b" onclick="room.setArrowTag(room.selectedArrow, '#f59e0b')">
+                        <span class="tag-dot-menu" style="background: #f59e0b;"></span>
+                        <span>Orange</span>
+                    </button>
+                    <button data-color="#10b981" onclick="room.setArrowTag(room.selectedArrow, '#10b981')">
+                        <span class="tag-dot-menu" style="background: #10b981;"></span>
+                        <span>Green</span>
+                    </button>
+                    <button data-color="#3b82f6" onclick="room.setArrowTag(room.selectedArrow, '#3b82f6')">
+                        <span class="tag-dot-menu" style="background: #3b82f6;"></span>
+                        <span>Blue</span>
+                    </button>
+                    <button data-color="#8b5cf6" onclick="room.setArrowTag(room.selectedArrow, '#8b5cf6')">
+                        <span class="tag-dot-menu" style="background: #8b5cf6;"></span>
+                        <span>Purple</span>
+                    </button>
+                    <button data-color="#ec4899" onclick="room.setArrowTag(room.selectedArrow, '#ec4899')">
+                        <span class="tag-dot-menu" style="background: #ec4899;"></span>
+                        <span>Pink</span>
+                    </button>
+                    <button data-color="#6366f1" onclick="room.setArrowTag(room.selectedArrow, '#6366f1')">
+                        <span class="tag-dot-menu" style="background: #6366f1;"></span>
+                        <span>Indigo</span>
+                    </button>
+                    <button data-color="#06b6d4" onclick="room.setArrowTag(room.selectedArrow, '#06b6d4')">
+                        <span class="tag-dot-menu" style="background: #06b6d4;"></span>
+                        <span>Cyan</span>
+                    </button>
+                </div>
+                <div class="submenu-divider"></div>
+                <button onclick="room.addCustomArrowTag(room.selectedArrow)">🎨 Custom Tag...</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Room Context Menu (for empty area) -->
+    <div id="roomContextMenu">
+        <div id="roomMenuPasteContainer">
+            <button id="roomMenuPaste" onclick="room.paste()">Paste <span class="menu-shortcut">Ctrl+V</span></button>
+            <div class="menu-divider"></div>
+        </div>
+        <button id="roomMenuResetPosition" onclick="projection.resetPan()">Reset Media Position</button>
+        <button id="roomMenuResetOverlay" onclick="control.resetPosition()">Reset Overlay Position</button>
+        <button id="roomMenuToggleSidebar" onclick="room.toggleSidebar()">Hide Sidebar</button>
+        <button id="roomMenuToggleControls" onclick="room.toggleControls()">Toggle Controls</button>
+    </div>
+    
+    <!-- File Context Menu -->
+    <div id="fileContextMenu">
+        <button id="fileMenuOpen">Open</button>
+        <button id="fileMenuRename">Rename</button>
+        <button id="fileMenuDelete">Delete</button>
+    </div>
+    
+    <div id="tagTooltip" style="position: fixed; display: none; background: rgba(0,0,0,0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 3000;"></div>
+    
+    <!-- Custom Prompt Dialog -->
+    <div id="promptDialog" style="display: none;">
+        <div id="promptDialogOverlay"></div>
+        <div id="promptDialogContent">
+            <div id="promptDialogHeader">
+                <h3 id="promptDialogTitle">Input</h3>
+            </div>
+            <div id="promptDialogBody">
+                <label id="promptDialogLabel"></label>
+                <input type="text" id="promptDialogInput" placeholder="">
+            </div>
+            <div id="promptDialogFooter">
+                <button id="promptDialogCancel">Cancel</button>
+                <button id="promptDialogConfirm">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Tag Dialog -->
+    <div id="customTagDialog" style="display: none;">
+        <div id="customTagDialogOverlay"></div>
+        <div id="customTagDialogContent">
+            <div id="customTagDialogHeader">
+                <h3 id="customTagDialogTitle">Create Custom Tag</h3>
+            </div>
+            <div id="customTagDialogBody">
+                <label for="customTagName">Tag Name:</label>
+                <input type="text" id="customTagName" placeholder="Enter tag name">
+                <label for="customTagColor">Tag Color:</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="color" id="customTagColorPicker" value="#3b82f6" style="width: 60px; height: 36px; border: 1px solid rgba(0,0,0,0.12); border-radius: 4px; cursor: pointer;">
+                    <input type="text" id="customTagColorInput" placeholder="#3b82f6" value="#3b82f6" style="flex: 1; padding: 8px 12px; border: 1px solid rgba(0,0,0,0.12); border-radius: 4px; font-size: 13px;">
+                </div>
+            </div>
+            <div id="customTagDialogFooter">
+                <button id="customTagDialogRemove" style="display: none;">Remove Tag</button>
+                <button id="customTagDialogCancel">Cancel</button>
+                <button id="customTagDialogConfirm">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="projection-layer"></div>
+    
+    <div id="room">
+        <svg id="arrowSpace"></svg>
+    </div>
+
+    <div id="panel-layer"></div>
+    <div id="proj-playlist-overlay" class="playlist-container" style="display: none; position: fixed; top: 70px; right: 20px; z-index: 70;"></div>
+    
+    <div id="controls-layer">
+        <div class="controls-container">
+            <div class="controls-group">
+                <div class="controls-bar">
+                    <!-- Load -->
+                    <label class="control-btn" title="Load Media">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                        </svg>
+                        <input type="file" multiple accept="video/*,image/*,audio/*" class="hidden" id="proj-file-input"/>
+                    </label>
+                    
+                    <!-- Prev -->
+                    <button class="control-btn" id="proj-prev" title="Previous">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                        </svg>
+                    </button>
+                    <!-- -5s -->
+                    <button class="control-btn" id="proj-back5" title="-5s">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="12" height="12">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M18.75 19.5l-7.5-7.5 7.5-7.5m-6 15L5.25 12l7.5-7.5" />
+                        </svg>
+                    </button>
+                    
+                    <!-- Play/Pause -->
+                    <button class="control-btn" id="proj-play" title="Play">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16" id="proj-play-icon">
+                            <!-- Icon set by update -->
+                        </svg>
+                    </button>
+                    
+                    <!-- +5s -->
+                    <button class="control-btn" id="proj-fwd5" title="+5s">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="12" height="12">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 4.5l7.5 7.5-7.5 7.5m-6-15l7.5 7.5-7.5 7.5" />
+                        </svg>
+                    </button>
+                    
+                    <!-- Next -->
+                    <button class="control-btn" id="proj-next" title="Next">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                    </button>
+                    
+                    <!-- Stop -->
+                    <button class="control-btn" id="proj-stop" title="Stop">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" />
+                        </svg>
+                    </button>
+                    
+                    <!-- Seek Toggle -->
+                    <button class="control-btn" id="proj-seek-toggle" title="Seek Bar">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
+                        </svg>
+                    </button>
+                    
+                    <!-- Loop Mode -->
+                    <button class="control-btn" id="proj-loop" title="Loop Mode" style="position: relative;">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3" />
+                        </svg>
+                        <span id="proj-loop-badge" style="position: absolute; bottom: -4px; right: -4px; font-size: 8px; font-weight: bold; color: #06b6d4; background: #000; padding: 0 2px; border-radius: 2px; border: 1px solid rgba(6, 182, 212, 0.5);">ALL</span>
+                    </button>
+
+                    <!-- Volume Toggle -->
+                    <button class="control-btn" id="proj-vol-toggle" title="Volume">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16" id="proj-vol-icon">
+                            <!-- Icon set by update -->
+                        </svg>
+                    </button>
+                    
+                    <!-- Bg Color -->
+                    <button class="control-btn" id="proj-bg-toggle" title="Background Color">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.85 6.361a15.996 15.996 0 00-4.647 4.761m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
+                        </svg>
+                    </button>
+
+                    <!-- Scale Toggle -->
+                    <button class="control-btn" id="proj-scale-toggle" title="Scale Media">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                        </svg>
+                    </button>
+
+                    <!-- Playlist Toggle -->
+                    <button class="control-btn" id="proj-playlist-toggle" title="Playlist">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                        </svg>
+                    </button>
+                    
+                    <!-- Toggle Room -->
+                    <button class="control-btn" id="proj-room-toggle" title="Toggle Room">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+                        </svg>
+                    </button>
+                    
+                    <!-- Toggle Panel -->
+                    <button class="control-btn" id="proj-panel-toggle" title="Hide Panel">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls-secondary-container">
+            <div class="controls-secondary-group">
+                <!-- Seek Bar -->
+                <div class="seek-bar-container hidden" id="proj-seek-bar">
+                    <span class="time-display" id="proj-time-current">0:00</span>
+                    <input type="range" class="slider" min="0" max="100" value="0" id="proj-seek-input">
+                    <span class="time-display" id="proj-time-total">0:00</span>
+                </div>
+                
+                <!-- Volume Bar -->
+                <div class="volume-bar-container hidden" id="proj-vol-bar">
+                    <button class="control-btn" id="proj-mute-btn" title="Mute/Unmute">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="12" height="12" id="proj-mute-icon">
+                            <!-- Icon set by update -->
+                        </svg>
+                    </button>
+                    <input type="range" class="slider" min="0" max="1" step="0.05" value="1" id="proj-vol-input">
+                </div>
+                
+                <!-- Bg Bar -->
+                <div class="bg-bar-container hidden" id="proj-bg-bar">
+                    <button class="color-btn" data-color="#000000" style="background-color: #000000; border: 1px solid #333;" title="Black"></button>
+                    <button class="color-btn" data-color="#ffffff" style="background-color: #ffffff;" title="White"></button>
+                    <button class="color-btn" data-color="#1A1B1D" style="background-color: #1A1B1D;" title="Gray"></button>
+                    <button class="color-btn" data-color="#FFFDD0" style="background-color: #FFFDD0;" title="Cream"></button>
+                </div>
+                
+                <!-- Scale Bar -->
+                <div class="volume-bar-container hidden" id="proj-scale-bar">
+                    <span style="font-size: 10px; color: #888; margin-right: 5px;">Scale</span>
+                    <input type="range" class="slider" min="0.1" max="1" step="0.05" value="1" id="proj-scale-input">
+                    <span id="proj-scale-value" style="font-size: 10px; color: #888; margin-left: 5px; min-width: 30px;">100%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Load main application -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

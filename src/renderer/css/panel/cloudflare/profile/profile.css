@@ -1,0 +1,160 @@
+/* Profile Manager */
+.profile-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.profile-auth-card {
+    /* Uses standard holo-card styles */
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.token-input-group {
+    display: flex;
+    gap: 8px;
+}
+
+.token-input-wrapper {
+    position: relative;
+    flex: 1;
+}
+
+.token-visibility-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    text-transform: uppercase;
+    color: var(--theme-text-muted);
+    opacity: 0.6;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+.token-visibility-toggle:hover {
+    color: var(--theme-primary);
+    opacity: 1;
+}
+
+.token-help-text {
+    margin-top: 4px;
+}
+
+.text-highlight {
+    color: var(--theme-primary);
+}
+
+.error-message {
+    margin-top: 24px;
+    padding: 16px;
+    background: rgba(255, 0, 85, 0.1);
+    border-left: 2px solid var(--theme-danger);
+    color: var(--theme-danger);
+    font-size: 12px;
+    font-family: monospace;
+}
+
+.profile-details-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+}
+@media (min-width: 768px) {
+    .profile-details-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.user-info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.info-label {
+    opacity: 0.5;
+    margin-bottom: 0;
+    color: var(--theme-text-muted);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+}
+
+.info-value {
+    color: var(--theme-text);
+    font-size: 13px;
+}
+
+.text-mono { font-family: inherit; }
+.text-primary { color: var(--theme-primary); }
+.text-small { font-size: 12px; }
+.text-uppercase { text-transform: uppercase; }
+
+.status-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-text {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.accounts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 16rem;
+    overflow-y: auto;
+}
+
+.account-item {
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(0, 243, 255, 0.2);
+    border-radius: var(--theme-radius-sm);
+    transition: all 0.2s;
+}
+.account-item:hover {
+    border-color: var(--theme-primary);
+    background: rgba(0, 243, 255, 0.05);
+}
+
+.account-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--theme-text);
+}
+
+.account-id {
+    font-size: 10px;
+    font-family: monospace;
+    color: var(--theme-text-muted);
+}

@@ -1,0 +1,319 @@
+/* Room Container */
+#room {
+    border: none;
+    background: transparent;
+    cursor: default;
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 10;
+    pointer-events: auto;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+#arrowSpace {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: transparent;
+    pointer-events: none;
+    z-index: 20;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#arrowSpace path {
+    pointer-events: none;
+}
+
+#arrowSpace path.hit-area {
+    stroke: transparent;
+    stroke-width: 20;
+    fill: none;
+    pointer-events: none;
+}
+
+/* Box Styles */
+.box {
+    position: absolute;
+    background: #ffffff;
+    border: 1px solid #dadce0;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    z-index: 30;
+    pointer-events: auto;
+    overflow: hidden;
+}
+
+.box.selected {
+    border: 1px solid #4285f4;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    z-index: 31;
+}
+
+.box-arrow-container {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    right: 6px;
+    bottom: 6px;
+    border-radius: 6px;
+    pointer-events: auto;
+}
+
+.box-text-container {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    overflow: auto;
+    pointer-events: auto;
+}
+
+.box-text-container::-webkit-scrollbar {
+    width: 0px;
+    height: 0px;
+}
+
+.box-text-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.box-text-container::-webkit-scrollbar-thumb {
+    background: #dadce0;
+    border-radius: 4px;
+}
+
+.box-text-container::-webkit-scrollbar-thumb:hover {
+    background: #bdc1c6;
+}
+
+.box-text {
+    min-height: 40px;
+    min-width: 120px;
+    font-size: 15px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #3c4043;
+    line-height: 20px;
+    white-space: pre-wrap;
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    cursor: text;
+    pointer-events: auto;
+    width: fit-content;
+    height: fit-content;
+}
+
+.box-text:focus {
+    outline: none;
+}
+
+.tag-dot {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    pointer-events: auto;
+    z-index: 31;
+}
+
+/* Box Context Menu */
+#boxContextMenu {
+    position: fixed;
+    display: none;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    z-index: 2000;
+    padding: 4px;
+    min-width: 100px;
+}
+
+#boxContextMenu button {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 6px 12px;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    text-align: left;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1f1f1f;
+    transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+}
+
+#boxContextMenu button:hover {
+    background: rgba(26, 115, 232, 0.08);
+    color: #1a73e8;
+}
+
+#boxContextMenu button:active {
+    transform: scale(0.98);
+}
+
+/* Arrow Context Menu */
+#arrowContextMenu {
+    position: fixed;
+    display: none;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    z-index: 2000;
+    padding: 4px;
+    min-width: 100px;
+}
+
+#arrowContextMenu button {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 6px 12px;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    text-align: left;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1f1f1f;
+    transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+}
+
+#arrowContextMenu button:hover {
+    background: rgba(26, 115, 232, 0.08);
+    color: #1a73e8;
+}
+
+#arrowContextMenu button:active {
+    transform: scale(0.98);
+}
+
+/* Room Context Menu */
+#roomContextMenu {
+    position: fixed;
+    display: none;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    z-index: 2000;
+    padding: 4px;
+    min-width: 140px;
+}
+
+#roomContextMenu button {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 6px 12px;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    text-align: left;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1f1f1f;
+    transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+}
+
+#roomContextMenu button:hover {
+    background: rgba(26, 115, 232, 0.08);
+    color: #1a73e8;
+}
+
+#roomContextMenu button:active {
+    transform: scale(0.98);
+}
+
+.menu-divider {
+    height: 1px;
+    background: rgba(0, 0, 0, 0.08);
+    margin: 4px 0;
+}
+
+.menu-shortcut {
+    margin-left: auto;
+    color: #5f6368;
+    font-size: 11px;
+    padding-left: 12px;
+}
+
+/* Submenu Styles */
+.menu-item-with-submenu {
+    position: relative;
+    width: 100%;
+}
+
+.menu-item-with-submenu::after {
+    display: none;
+}
+
+.submenu {
+    display: none;
+    position: absolute;
+    left: 100%;
+    top: -4px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    padding: 4px;
+    min-width: 140px;
+    margin-left: 4px;
+}
+
+.menu-item-with-submenu:hover .submenu {
+    display: block;
+}
+
+.submenu button {
+    padding: 6px 12px;
+    width: 100%;
+    text-align: left;
+    border-radius: 4px;
+}
+
+.submenu-divider {
+    height: 1px;
+    background: rgba(0, 0, 0, 0.08);
+    margin: 4px 0;
+}
+
+.tag-dot-menu {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}

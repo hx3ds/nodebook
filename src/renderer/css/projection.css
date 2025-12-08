@@ -1,0 +1,57 @@
+#projection-layer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 5;
+    pointer-events: auto;
+    background: #000;
+}
+
+/* Projection Styles */
+.projection-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    transition: background-color 0.5s;
+}
+
+.projection-content {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.projection-media {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.projection-void-bg {
+    position: absolute;
+    top: 25%;
+    left: 25%;
+    width: 500px;
+    height: 500px;
+    background: rgba(6, 182, 212, 0.1);
+    border-radius: 50%;
+    filter: blur(120px);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}

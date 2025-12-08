@@ -1,0 +1,215 @@
+/* DNS Manager */
+.dns-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.auth-placeholder {
+    padding: 16px;
+    text-align: center;
+    color: var(--theme-primary);
+    opacity: 0.5;
+}
+
+.zone-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.zone-card {
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(0, 243, 255, 0.2);
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: var(--theme-radius-sm);
+    color: inherit;
+    width: 100%;
+}
+.zone-card:hover {
+    border-color: var(--theme-primary);
+    background: rgba(0, 243, 255, 0.05);
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.1);
+}
+.zone-card.active {
+    border-color: var(--theme-primary);
+    background: rgba(0, 243, 255, 0.1);
+    box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+}
+
+.zone-name {
+    font-weight: 600;
+    color: var(--theme-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.zone-card:hover .zone-name {
+    color: var(--theme-primary);
+}
+
+.zone-plan, .zone-status {
+    font-size: 10px;
+    font-family: monospace;
+    color: var(--theme-text-muted);
+    margin-top: 4px;
+}
+.zone-status {
+    opacity: 0.6;
+}
+
+.zone-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.zone-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--theme-primary);
+    text-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+    margin: 0;
+    letter-spacing: -0.02em;
+}
+
+.zone-id {
+    font-size: 12px;
+    color: var(--theme-text-muted);
+    font-family: monospace;
+    margin-top: 4px;
+}
+
+.header-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.records-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.add-record-form {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(0, 243, 255, 0.2);
+    padding: 16px;
+    margin-bottom: 16px;
+    border-radius: var(--theme-radius-sm);
+}
+
+.record-form-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 8px;
+    align-items: end;
+}
+.field-type { grid-column: span 2; }
+.field-name { grid-column: span 3; }
+.field-content { grid-column: span 4; }
+.field-proxy { 
+    grid-column: span 1; 
+    display: flex; 
+    justify-content: center; 
+    padding-bottom: 12px; 
+}
+.field-action { grid-column: span 2; }
+
+.proxy-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+.proxy-text {
+    font-size: 10px;
+    color: var(--theme-primary);
+    text-transform: uppercase;
+}
+.accent-secondary {
+    accent-color: var(--theme-primary);
+}
+
+.records-table-container {
+    overflow-x: auto;
+}
+
+.records-table {
+    width: 100%;
+    text-align: left;
+    font-size: 12px;
+    border-collapse: collapse;
+}
+
+.records-thead {
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--theme-text-muted);
+    text-transform: uppercase;
+    font-family: monospace;
+}
+
+.records-tbody tr {
+    border-top: 1px solid rgba(0, 243, 255, 0.2);
+}
+
+.record-row:hover {
+    background-color: rgba(0, 243, 255, 0.05);
+}
+
+.record-cell {
+    padding: 12px;
+}
+
+.type-cell {
+    font-weight: 700;
+    color: var(--theme-primary);
+    width: 64px;
+}
+
+.name-cell {
+    font-family: monospace;
+    color: var(--theme-text);
+}
+
+.content-cell {
+    font-family: monospace;
+    color: var(--theme-text-muted);
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.proxy-cell {
+    
+}
+
+.text-orange { color: #FF9F0A; }
+.text-gray { color: #8E8E93; }
+
+.delete-record-btn {
+    background: none;
+    border: none;
+    color: var(--theme-danger);
+    text-transform: uppercase;
+    font-size: 10px;
+    cursor: pointer;
+    opacity: 0.7;
+}
+.delete-record-btn:hover {
+    color: var(--theme-danger);
+    opacity: 1;
+    text-shadow: 0 0 5px rgba(255, 0, 85, 0.4);
+}
+
+.empty-message {
+    padding: 16px;
+    text-align: center;
+    opacity: 0.5;
+}

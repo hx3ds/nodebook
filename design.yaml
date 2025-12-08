@@ -1,0 +1,122 @@
+dataStructure:
+  box:
+    properties:
+      - id
+      - x
+      - y
+      - width
+      - height
+      - defaultWidth
+      - defaultHeight
+      - text
+      - expanded
+      - tag
+      - elementType
+      - linkedNotePath
+      - scrollOffset
+      - arrows (array of arrow objects with this box as source)
+
+  arrow (stored in box.arrows):
+    properties:
+      - id
+      - source (reference to source box)
+      - target (reference to target box)
+      - tag
+
+rendering:
+  methods:
+    - drawBox(box, fresh)
+    - drawArrow(arrow)
+
+
+elementTypes:
+  - box text container
+    box arrow container
+  - box
+  - arrow
+  - room
+
+events:
+  - selectingBox
+  - creatingArrow
+  - resizingBox
+  - selectingArrow
+  - selectingRoom
+  - movingBox
+  - panning
+  - editingBox
+  - createingBox
+  - showingBoxContextMenu
+  - showingArrowContextMenu
+  - showingRoomContextMenu
+
+mouseHandlers:
+  handleMouseDown:
+    leftClick:
+      boxTextContainer: selectingBox
+      boxArrowContainer: creatingArrow
+      box: resizingBox
+      arrow: selectingArrow
+      room: selectingRoom
+    
+    middleClick:
+      boxTextContainer: movingBox
+      boxArrowContainer: movingBox
+      box: movingBox
+      arrow: nothing
+      room: panning
+    
+    rightClick:
+      boxTextContainer: showingBoxContextMenu
+      boxArrowContainer: showingBoxContextMenu
+      box: showingBoxContextMenu
+      arrow: showingArrowContextMenu
+      room: showingRoomContextMenu
+    
+    doubleClick:
+      boxTextContainer: editingBox
+      boxArrowContainer: editingBox
+      box: editingBox
+      arrow: nothing
+      room: creatingBox
+
+  handleMouseMove:
+    events:
+      - selectingBox
+      - creatingArrow
+      - resizingBox
+      - selectingArrow
+      - selectingRoom
+      - movingBox
+      - panning
+      - showingBoxContextMenu
+      - showingArrowContextMenu
+      - showingRoomContextMenu
+      - editingBox
+      - createingBox
+
+  handleMouseUp:
+    events:
+      - selectingBox
+      - creatingArrow
+      - resizingBox
+      - selectingArrow
+      - selectingRoom
+      - movingBox
+      - panning
+      - showingBoxContextMenu
+      - showingArrowContextMenu
+      - showingRoomContextMenu
+      - editingBox
+      - createingBox
+
+boxUIElements:
+  expandButton:
+    description: expand to show all text
+  resizer:
+    description: use css resize: both, use observer to observe size change and update box width and height
+  tag:
+    description: hover to show tag tooltip
+
+requirements:
+  - One roomEventHandlers.js to handle all mouse events in the room, no need to have boxEventHandlers.js or arrowEventHandlers.js
