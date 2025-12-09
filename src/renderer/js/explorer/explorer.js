@@ -172,8 +172,35 @@ export const explorer = {
         
         document.getElementById('currentFolderPath').textContent = this.rootPath;
         
+        // Ensure root is expanded by default so content is visible
+        this.expandedFolders.add(this.rootPath);
+        
+        // Derive folder name from path
+        const separator = this.rootPath.includes('\\') ? '\\' : '/';
+        let folderName = this.rootPath.split(separator).pop();
+        if (!folderName) folderName = this.rootPath; // Fallback if split fails or root drive
+
+        // Create a root item representing the opened folder
+        const rootItem = {
+            name: folderName,
+            path: this.rootPath,
+            isDirectory: true
+        };
+
         try {
-            await this.renderDirectory(this.rootPath, fileTree, 0);
+            // Create the root item at level 0
+            // createTreeItem will check expandedFolders and call renderDirectory to populate children
+            const rootEl = this.createTreeItem(rootItem, 0);
+            
+            // Disable dragging for the root node itself (optional but good practice)
+            const header = rootEl.querySelector('.tree-item-header');
+            if (header) {
+                header.draggable = false;
+                // Add a special class if needed for styling
+                header.classList.add('root-folder');
+            }
+
+            fileTree.appendChild(rootEl);
         } catch (error) {
             console.error('Error refreshing file tree:', error);
         }
@@ -308,7 +335,7 @@ export const explorer = {
     async handleItemDoubleClick(item, e) {
         e.stopPropagation();
         
-        if (!item.isDirectory && item.name.endsWith('.json')) {
+        if (!item.isDirectory) {
             await this.openFile(item.path);
         }
     },
@@ -336,7 +363,26 @@ export const explorer = {
         
         try {
             const content = await window.electronAPI.readFile(filePath);
-            const data = JSON.parse(content);
+            
+            let data;
+            try {
+                data = JSON.parse(content);
+            } catch (e) {
+                // Not a valid JSON, maybe a newly created empty file or other text file
+                // Try to initialize as empty state if empty
+                if (!content.trim()) {
+                    data = { boxes: [], arrows: [] };
+                } else {
+                    // Try to parse anyway, or show error?
+                    // For now, let's treat non-JSON text as potential "text content" if we were to support it,
+                    // but the requirement says "support regardless file name, try parsing it to load".
+                    // So if parsing fails, we might just throw or alert.
+                    // But maybe user wants to open ANY file and see if it works.
+                    // If it fails to parse, we can't loadState.
+                    console.error('JSON parse error, attempting to load as empty/raw', e);
+                    throw new Error('Invalid file format');
+                }
+            }
             
             // Set current file path BEFORE refreshing tree so the active-file class gets applied
             this.currentFilePath = filePath;
@@ -519,13 +565,11 @@ export const explorer = {
 
     handleDragOver(e, targetItem, targetDiv) {
         e.preventDefault();
+        e.stopPropagation();
 
-        if (targetItem.isDirectory) {
-            targetDiv.classList.add('drag-over');
-            e.dataTransfer.dropEffect = 'move';
-        } else {
-            e.dataTransfer.dropEffect = 'none';
-        }
+        // Allow drop on both folders and files (to drop into parent folder)
+        targetDiv.classList.add('drag-over');
+        e.dataTransfer.dropEffect = 'move';
     },
 
     handleDragLeave(e, targetDiv) {
@@ -538,10 +582,9 @@ export const explorer = {
         e.preventDefault();
         e.stopPropagation();
         
-        const targetDiv = e.target.closest('.tree-item-header');
+        // Find the closest header in case event target is different (though pointer-events: none helps)
+        const targetDiv = e.currentTarget; 
         if (targetDiv) targetDiv.classList.remove('drag-over');
-
-        if (!targetItem.isDirectory) return;
 
         try {
             const data = e.dataTransfer.getData('text/plain');
@@ -549,10 +592,29 @@ export const explorer = {
             
             const sourceItem = JSON.parse(data);
             
-            // Prevent moving into self
+            // Determine target directory path
+            let targetDirPath = targetItem.path;
+            
+            // If dropped onto a file, use its parent directory
+            if (!targetItem.isDirectory) {
+                const separator = targetDirPath.includes('\\') ? '\\' : '/';
+                targetDirPath = targetDirPath.substring(0, targetDirPath.lastIndexOf(separator));
+            }
+            
+            // Prevent moving into self (if source is same as target file)
             if (sourceItem.path === targetItem.path) return;
             
-            await this.moveFile(sourceItem, targetItem.path);
+            // Prevent moving into same parent directory (no-op)
+            const separator = sourceItem.path.includes('\\') ? '\\' : '/';
+            const sourceParent = sourceItem.path.substring(0, sourceItem.path.lastIndexOf(separator));
+            
+            // Normalize paths for comparison (handle potential slash differences)
+            const normSourceParent = sourceParent.replace(/\\/g, '/');
+            const normTargetDir = targetDirPath.replace(/\\/g, '/');
+            
+            if (normSourceParent === normTargetDir) return;
+            
+            await this.moveFile(sourceItem, targetDirPath);
         } catch (error) {
             console.error('Drop error:', error);
         }
@@ -560,9 +622,9 @@ export const explorer = {
 
     handleContainerDragOver(e) {
         e.preventDefault();
-        // Check if we are dragging over the container background (not a tree item)
-        // If the event target is the fileTree itself or something that isn't a tree-item
-        if (!e.target.closest('.tree-item-header')) {
+        // Check if we are dragging over the container background (not a tree item or its children)
+        // If we are over a tree-node, we are likely inside the tree structure, not the empty root space.
+        if (!e.target.closest('.tree-node')) {
             document.getElementById('fileTree').classList.add('drag-over-container');
             e.dataTransfer.dropEffect = 'move';
         } else {
@@ -585,13 +647,43 @@ export const explorer = {
         // Only handle if dropped on the container directly (not on a child tree item)
         if (e.target.closest('.tree-item-header')) return;
         
+        // Also avoid handling if dropped inside a tree node structure (e.g. subfolder list)
+        // We only want "empty space" to mean the root container background
+        if (e.target.closest('.tree-node')) return;
+        
         if (!this.rootPath) return;
 
         try {
             const data = e.dataTransfer.getData('text/plain');
             if (!data) return;
             
-            const sourceItem = JSON.parse(data);
+            let sourceItem;
+            try {
+                sourceItem = JSON.parse(data);
+            } catch (err) {
+                return; // Not a valid internal drag
+            }
+            
+            if (!sourceItem || !sourceItem.path) return;
+            
+            // Normalize everything to forward slashes first for consistent comparison
+            const sourcePath = sourceItem.path.replace(/\\/g, '/');
+            const rootPath = this.rootPath.replace(/\\/g, '/');
+            
+            // Get parent directory of source file
+            // Handle case where path might end with slash (shouldn't for files, but maybe folders?)
+            const cleanSourcePath = sourcePath.endsWith('/') ? sourcePath.slice(0, -1) : sourcePath;
+            const sourceParent = cleanSourcePath.substring(0, cleanSourcePath.lastIndexOf('/'));
+            
+            // If parent is root (after normalization), do nothing
+            // Compare case-insensitively for Windows? 
+            // Let's stick to exact match first, but usually casing matches if from same app.
+            if (sourceParent.toLowerCase() === rootPath.toLowerCase()) {
+                console.log('File already in root');
+                return;
+            }
+
+            console.log(`Moving ${sourceItem.name} to root`);
             await this.moveFile(sourceItem, this.rootPath);
         } catch (error) {
             console.error('Container drop error:', error);

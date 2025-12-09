@@ -110,6 +110,11 @@
     padding-right: 10px;
 }
 
+/* Ensure children don't interfere with drag events */
+.tree-item-header * {
+    pointer-events: none;
+}
+
 .tree-item-header:hover {
     background: var(--sidebar-hover);
 }
