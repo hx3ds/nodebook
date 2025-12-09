@@ -2,6 +2,12 @@ import { projection } from './projection.js';
 
 export const projectionEventHandlers = {
     handleMouseDown(e) {
+        // Verify that the event target is actually within the projection layer
+        // This prevents interference when clicking on elements in the room layer (which is on top)
+        if (e.target !== projection.element && !projection.element.contains(e.target)) {
+            return;
+        }
+
         // Left click is button 0
         if (e.button === 0) {
             if (window.room) {

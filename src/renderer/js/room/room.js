@@ -403,9 +403,17 @@ export const room = {
         } else if (type === 'markdown') {
             box.type = 'markdown';
             box.linkedNotePath = null;
+        } else if (type === 'html') {
+            box.type = 'html';
+            box.linkedNotePath = null;
         }
 
-        room.drawBox(box, false);
+        // Remove old element and redraw fresh to apply type changes and event listeners
+        if (box.element) {
+            box.element.remove();
+            box.element = null;
+        }
+        room.drawBox(box, true);
         room.pushHistory();
         room.saveState();
         this.hideContextMenu();
@@ -671,14 +679,13 @@ export const room = {
         this.element.addEventListener('mousemove', handlers.handleMouseMove);
         this.element.addEventListener('mouseup', handlers.handleMouseUp);
         this.element.addEventListener('mouseleave', handlers.handleMouseLeave);
-        
-        // Touch events
-        this.element.addEventListener('touchstart', handlers.handleTouchStart, { passive: false });
-        this.element.addEventListener('touchmove', handlers.handleTouchMove, { passive: false });
-        this.element.addEventListener('touchend', handlers.handleTouchEnd);
 
         this.element.addEventListener('contextmenu', handlers.handleContextMenu);
         document.addEventListener('keydown', handlers.handleKeyDown);
+        
+        // Prevent default drag/drop behavior globally to avoid opening files in new window
+        document.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'none'; });
+        document.addEventListener('drop', (e) => e.preventDefault());
     },
 
 
@@ -900,8 +907,8 @@ export const room = {
     },
 
 
-    drawAll() {
-        room.drawBoxes();
+    drawAll(fresh = false) {
+        room.drawBoxes(fresh);
         room.drawArrows();
     },
 
@@ -948,8 +955,16 @@ export const room = {
                     textDiv.innerHTML = box._markdownCache.html;
                     textDiv.classList.add('markdown-content');
                 }
+            } else if (box.type === 'html' && box.text) {
+                textDiv.innerHTML = box.text;
+                textDiv.classList.add('html-content');
             } else {
                 textDiv.textContent = box.text || '';
+            }
+
+            if (box.type === 'html') {
+                boxDiv.addEventListener('dragover', handlers.handleBoxDragOver);
+                boxDiv.addEventListener('drop', handlers.handleBoxDrop);
             }
 
             let textBeforeEdit = box.text;
@@ -995,7 +1010,6 @@ export const room = {
         } else {
             const boxDiv = box.element;
             if (!boxDiv) return;
-
             const isSelected = room.selectedBox === box || room.selectedBoxes.includes(box);
 
             if (isSelected && !boxDiv.classList.contains('selected')) {
@@ -1055,6 +1069,39 @@ export const room = {
                 });
                 arrowsToRedraw.forEach(arrow => room.drawArrow(arrow));
             }
+
+            // Update text content if changed (crucial for drop handling and collaborative sync)
+            const textDiv = boxDiv.querySelector('.box-text');
+            if (textDiv && room.editingBox !== box) { // Don't update if currently editing
+                if (box.type === 'markdown' && box.text) {
+                    if (!box._markdownCache || box._markdownCache.text !== box.text) {
+                        const html = room.parseMarkdown(box.text);
+                        box._markdownCache = {
+                            text: box.text,
+                            html: html
+                        };
+                        textDiv.innerHTML = html;
+                        textDiv.classList.add('markdown-content');
+                    } else {
+                        // Cache hit, but ensure DOM is consistent
+                        if (textDiv.innerHTML !== box._markdownCache.html) {
+                            textDiv.innerHTML = box._markdownCache.html;
+                            textDiv.classList.add('markdown-content');
+                        }
+                    }
+                } else if (box.type === 'html' && box.text) {
+                     // For HTML boxes, always update if content differs to ensure videos/images appear
+                     if (textDiv.innerHTML !== box.text) {
+                        textDiv.innerHTML = box.text;
+                        textDiv.classList.add('html-content');
+                     }
+                } else {
+                    // Plain text
+                    if (textDiv.textContent !== (box.text || '')) {
+                        textDiv.textContent = box.text || '';
+                    }
+                }
+            }
         }
     },
 
@@ -1093,9 +1140,11 @@ export const room = {
         return tagDot;
     },
 
-    drawBoxes() {
-        room.element.querySelectorAll('.box').forEach(el => el.remove());
-        room.boxes.forEach(box => room.drawBox(box, true));
+    drawBoxes(fresh) {
+        if (fresh) {
+            room.element.querySelectorAll('.box').forEach(el => el.remove());
+        }
+        room.boxes.forEach(box => room.drawBox(box, fresh));
     },
 
     drawArrow(arrow) {
@@ -1416,14 +1465,21 @@ export const room = {
     startEditing(box) {
         room.editingBox = box;
         const textDiv = room.editingBox.element.querySelector('.box-text');
-        console.log("Editing box:", room.editingBox);
         // If it's a markdown box, switch to source text for editing
         if (box.type === 'markdown') {
             textDiv.textContent = box.text || '';
             textDiv.classList.remove('markdown-content');
             textDiv.classList.add('markdown-mode');
+        } else if (box.type === 'html') {
+            if (textDiv.classList.contains('html-content')) {
+                box.text = textDiv.innerHTML;
+                box._htmlCache = Array.from(textDiv.childNodes);
+                textDiv.innerHTML = '';
+            }
+            textDiv.textContent = box.text || '';
+            textDiv.classList.remove('html-content');
+            textDiv.classList.add('html-mode');
         }
-        console.log("Text div:", textDiv);
         textDiv.contentEditable = 'true';
     },
 
@@ -1431,7 +1487,6 @@ export const room = {
         if (!room.editingBox) return;
         if (room.editingBox !== room.selectedBox) {
             const textDiv = room.editingBox.element.querySelector('.box-text');
-            
             // If it's a markdown box, switch back to rendered view
             if (room.editingBox.type === 'markdown') {
                 textDiv.classList.remove('markdown-mode');
@@ -1444,6 +1499,20 @@ export const room = {
                 };
                 textDiv.innerHTML = html;
                 textDiv.classList.add('markdown-content');
+            } else if (room.editingBox.type === 'html') {
+                textDiv.classList.remove('html-mode');
+                
+                textDiv.innerHTML = '';
+                if (room.editingBox._htmlCache) {
+                    room.editingBox._htmlCache.forEach(el => textDiv.appendChild(el));
+                    delete room.editingBox._htmlCache;
+                }
+                
+                if (textDiv.innerHTML !== room.editingBox.text) {
+                    textDiv.innerHTML = room.editingBox.text;
+                }
+                
+                textDiv.classList.add('html-content');
             }
             
             textDiv.contentEditable = 'false';
@@ -1466,6 +1535,8 @@ export const room = {
         // textContainer has padding: top: 12px, left: 12px, right: 12px, bottom: 12px
         // textDiv has padding: left: 5px, right: 5px
         const containerPadding = 36; // 12px left + 12px right (and same for top/bottom)
+        
+
         
         // Get the scroll dimensions
         const scrollWidth = textDiv.scrollWidth;
@@ -1975,7 +2046,7 @@ export const room = {
         room.selectedBoxes = [];
         room.selectedArrow = null;
 
-        room.drawAll();
+        room.drawAll(true);
     },
 
     pushHistory() {
@@ -2131,6 +2202,6 @@ export const room = {
         this.offset.y = viewportCenterY - boxCenterY;
         
         // Redraw everything with the new offset (this pans the view)
-        this.drawAll();
+        this.drawAll(false);
     }
 };

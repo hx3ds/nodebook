@@ -5,6 +5,8 @@ import { panel } from '../panel/panel.js';
 export const roomEventHandlers = {
     // Main event handlers
     handleDblClick(e) {
+        e.stopPropagation();
+        e.preventDefault();
         const pos = room.getMousePos(e);
         const { owner, elementType } = room.getElementOwner(e.target, pos);
         switch (elementType) {
@@ -72,10 +74,7 @@ export const roomEventHandlers = {
             }, 200);
         }
 
-        // Always finish editing and hide context menu when starting a new interaction
-        if (room.editingBox) {
-            room.finishEditing();
-        }
+        // Always hide context menu when starting a new interaction
         room.hideContextMenu();
 
         const ctrlOrCmd = e.ctrlKey || e.metaKey;
@@ -160,6 +159,9 @@ export const roomEventHandlers = {
                 }
                 break;
         }
+        if (room.editingBox) {
+            room.finishEditing();
+        }
     },
 
     handleMouseMove(e) {
@@ -231,7 +233,7 @@ export const roomEventHandlers = {
                 room.lastPanPos = { x: e.clientX, y: e.clientY };
                 room.element.style.cursor = 'grabbing';
 
-                room.drawAll();
+                room.drawAll(false);
                 room.updateSelectionPreview();
                 break;
         }
@@ -361,88 +363,65 @@ export const roomEventHandlers = {
         // Context menu is handled in handleMouseDown with right click
     },
 
-    handleTouchStart(e) {
-        if (e.touches.length === 2) {
-            e.preventDefault();
-            const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-            const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-            
-            const target = document.elementFromPoint(cx, cy);
-            if (!target) return;
-            
-            // Replicate room.getMousePos logic for touch center
-            const rect = room.element.getBoundingClientRect();
-            const pos = {
-                x: (cx - rect.left) - room.offset.x,
-                y: (cy - rect.top) - room.offset.y
-            };
-
-            const { owner, elementType } = room.getElementOwner(target, pos);
-
-            if (elementType === 'box' || elementType === 'box-text-container' || elementType === 'box-arrow-container') {
-                registerEvent('movingBox');
-                room.selectBox(owner, false);
-                room.dragOffset = {
-                    x: pos.x - owner.x,
-                    y: pos.y - owner.y
-                };
-            } else {
-                registerEvent('panning');
-                room.lastPanPos = { x: cx, y: cy };
-                room.element.style.cursor = 'grabbing';
-            }
-        }
-    },
-
-    handleTouchMove(e) {
-        if (!room.inEvent) return;
+    handleBoxDragOver(e) {
+        e.preventDefault();
+        e.stopPropagation();
         
-        if (e.touches.length === 2) {
-            e.preventDefault();
-            const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-            const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-
-            if (room.event === 'panning') {
-                const dx = cx - room.lastPanPos.x;
-                const dy = cy - room.lastPanPos.y;
-                room.offset.x += dx;
-                room.offset.y += dy;
-                room.lastPanPos = { x: cx, y: cy };
-                room.element.style.cursor = 'grabbing';
-                room.drawAll();
-                room.updateSelectionPreview();
-            } else if (room.event === 'movingBox') {
-                const rect = room.element.getBoundingClientRect();
-                const pos = {
-                    x: (cx - rect.left) - room.offset.x,
-                    y: (cy - rect.top) - room.offset.y
-                };
-                
-                const boxesToMove = room.selectedBoxes.length > 0 ? room.selectedBoxes :
-                    (room.selectedBox ? [room.selectedBox] : []);
-                
-                boxesToMove.forEach(box => {
-                    box.x = pos.x - room.dragOffset.x;
-                    box.y = pos.y - room.dragOffset.y;
-                    room.drawBox(box, false);
-                });
-                room.drawArrows();
-            }
+        const boxDiv = e.target.closest('.box');
+        if (boxDiv && boxDiv.owner && boxDiv.owner.type === 'html') {
+            e.dataTransfer.dropEffect = 'copy';
+        } else {
+            e.dataTransfer.dropEffect = 'none';
         }
     },
 
-    handleTouchEnd(e) {
-        if (room.inEvent && e.touches.length < 2) {
-             if (room.event === 'movingBox') {
-                room.pushHistory();
-                room.saveState();
-                room.drawArrows();
-                room.dragOffset = { x: 0, y: 0 };
-             } else if (room.event === 'panning') {
-                room.element.style.cursor = 'default';
-                room.lastPanPos = { x: 0, y: 0 };
-             }
-             room.inEvent = false;
+    handleBoxDrop(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length === 0) return;
+
+        const boxDiv = e.target.closest('.box');
+        if (!boxDiv || !boxDiv.owner) return;
+        
+        const box = boxDiv.owner;
+
+        if (box.type !== 'html') return;
+
+        let newContent = box.text || '';
+        let changed = false;
+        
+        for (const file of files) {
+            const isImage = file.type.startsWith('image/');
+            const isVideo = file.type.startsWith('video/');
+            
+            if (isImage || isVideo) {
+                let filePath = file.path;
+                
+                if (filePath) {
+                    filePath = filePath.replace(/\\/g, '/');
+                    // Ensure it starts with / if not windows drive? 
+                    // Windows path: D:/... -> file:///D:/...
+                    // Linux/Mac: /home/... -> file:///home/...
+                    const src = `file://${filePath}`;
+                    
+                    if (isImage) {
+                        newContent += `<img src="${src}" style="max-width: 100%; display: block;">`;
+                        changed = true;
+                    } else {
+                        newContent += `<video src="${src}" controls style="max-width: 100%; display: block;"></video>`;
+                        changed = true;
+                    }
+                }
+            }
+        }
+        
+        if (changed) {
+            box.text = newContent;
+            room.drawBox(box, false);
+            room.pushHistory();
+            room.saveState();
         }
     },
 

@@ -34,6 +34,15 @@ export const projection = {
         this.element = document.getElementById('projection-layer');
         this.renderProjection();
         this.setupEventListeners();
+        this.restoreState();
+        
+        // Auto-save state every 5 seconds if playing
+        setInterval(() => {
+            if (this.isPlaying && (this.videoElement || this.audioElement)) {
+                this.saveState();
+            }
+        }, 5000);
+        
         // control is initialized by main.js
     },
 
@@ -67,6 +76,14 @@ export const projection = {
         this.panX = x;
         this.panY = y;
         this.updateTransform();
+    },
+
+    setBackgroundColor(color) {
+        this.bgColor = color;
+        const container = this.element.querySelector('.projection-container');
+        if (container) {
+            container.style.backgroundColor = this.bgColor;
+        }
     },
 
     resetPan() {
@@ -111,15 +128,84 @@ export const projection = {
                 return {
                     name: file.name,
                     type: type,
-                    url: URL.createObjectURL(file)
+                    url: URL.createObjectURL(file),
+                    path: file.path
                 };
             }).sort((a, b) => a.name.localeCompare(b.name));
             
             this.currentIndex = 0;
             this.isPlaying = true;
             this.updateProjection();
+            this.saveState();
             
             if (window.control) window.control.update();
+        }
+    },
+
+    saveState() {
+        const state = {
+            playlist: this.playlist.map(item => item.path).filter(p => p),
+            currentIndex: this.currentIndex,
+            currentTime: (this.videoElement && !this.videoElement.paused) ? this.videoElement.currentTime : 
+                         (this.audioElement && !this.audioElement.paused) ? this.audioElement.currentTime :
+                         (this.videoElement ? this.videoElement.currentTime : (this.audioElement ? this.audioElement.currentTime : 0)),
+            loopMode: this.loopMode,
+            volume: this.volume,
+            isMuted: this.isMuted
+        };
+        localStorage.setItem('projectionState', JSON.stringify(state));
+    },
+
+    restoreState() {
+        const saved = localStorage.getItem('projectionState');
+        if (saved) {
+            try {
+                const state = JSON.parse(saved);
+                
+                if (state.playlist && Array.isArray(state.playlist)) {
+                    this.playlist = state.playlist.map(path => {
+                        const name = path.split(/[\\/]/).pop();
+                        let type = 'application/octet-stream';
+                        const ext = name.split('.').pop().toLowerCase();
+                        
+                        if (['mp4', 'webm', 'ogg', 'mov'].includes(ext)) type = 'video/' + (ext === 'mov' ? 'quicktime' : ext);
+                        else if (['mp3', 'wav', 'ogg'].includes(ext)) type = 'audio/' + (ext === 'mp3' ? 'mpeg' : ext);
+                        else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) type = 'image/' + (ext === 'svg' ? 'svg+xml' : ext);
+                        else if (ext === 'pdf') type = 'application/pdf';
+                        else if (ext === 'html' || ext === 'htm') type = 'text/html';
+                        else if (ext === 'txt') type = 'text/plain';
+                        
+                        return {
+                            name: name,
+                            type: type,
+                            url: 'file://' + path.replace(/\\/g, '/'), // Ensure forward slashes for URL
+                            path: path
+                        };
+                    });
+                }
+                
+                if (state.volume !== undefined) this.volume = state.volume;
+                if (state.isMuted !== undefined) this.isMuted = state.isMuted;
+                if (state.loopMode) this.loopMode = state.loopMode;
+                
+                if (this.playlist.length > 0 && state.currentIndex >= 0 && state.currentIndex < this.playlist.length) {
+                    this.currentIndex = state.currentIndex;
+                    this.isPlaying = false; // Start paused
+                    this.updateProjection();
+                    
+                    const mediaEl = this.videoElement || this.audioElement;
+                    if (mediaEl && state.currentTime) {
+                        const restoreTime = () => {
+                            mediaEl.currentTime = state.currentTime;
+                        };
+                        // Attempt to set immediately and on metadata
+                        mediaEl.currentTime = state.currentTime;
+                        mediaEl.addEventListener('loadedmetadata', restoreTime, { once: true });
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to restore projection state:', e);
+            }
         }
     },
     
@@ -142,6 +228,7 @@ export const projection = {
                 this.isPlaying = !this.isPlaying;
             }
         }
+        this.saveState();
         if (window.control) window.control.update();
     },
     
@@ -157,6 +244,7 @@ export const projection = {
         }
         this.currentIndex = -1;
         this.updateProjection();
+        this.saveState();
         if (window.control) window.control.update();
     },
     
@@ -182,6 +270,7 @@ export const projection = {
         }
         this.isPlaying = true;
         this.updateProjection();
+        this.saveState();
         if (window.control) window.control.update();
     },
     
@@ -200,6 +289,7 @@ export const projection = {
         }
         this.isPlaying = true;
         this.updateProjection();
+        this.saveState();
         if (window.control) window.control.update();
     },
     
@@ -219,11 +309,13 @@ export const projection = {
         this.isMuted = !this.isMuted;
         if (this.videoElement) this.videoElement.muted = this.isMuted;
         if (this.audioElement) this.audioElement.muted = this.isMuted;
+        this.saveState();
         if (window.control) window.control.update();
     },
     
     toggleLoopMode() {
         this.loopMode = this.loopMode === 'single' ? 'list' : 'single';
+        this.saveState();
         if (window.control) window.control.update();
     },
     
@@ -231,6 +323,7 @@ export const projection = {
         this.volume = val;
         if (this.videoElement) this.videoElement.volume = this.volume;
         if (this.audioElement) this.audioElement.volume = this.volume;
+        this.saveState();
         if (window.control) window.control.update();
     },
     

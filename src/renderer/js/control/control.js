@@ -17,6 +17,11 @@ export const control = {
     holdTimeout: null,
     triggeringMovement: false,
     mouseDownEvent: null,
+    
+    // Scroll State
+    scrollTarget: null,
+    initialScrollLeft: 0,
+    dragStartX: 0,
 
     init() {
         this.element = document.getElementById('controls-layer');
@@ -287,7 +292,7 @@ export const control = {
             playlistEl.innerHTML = `
                 <div class="playlist-header">
                     <div class="playlist-title">PLAYLIST <span class="playlist-count">(0)</span></div>
-                    <button class="control-btn" id="proj-pl-close" style="width:24px; height:24px;">
+                    <button class="control-btn" id="proj-pl-close">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -299,7 +304,7 @@ export const control = {
             playlistEl.innerHTML = `
                 <div class="playlist-header">
                     <div class="playlist-title">PLAYLIST <span class="playlist-count">(${projection.playlist.length})</span></div>
-                    <button class="control-btn" id="proj-pl-close" style="width:24px; height:24px;">
+                    <button class="control-btn" id="proj-pl-close">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>

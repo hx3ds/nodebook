@@ -2,6 +2,15 @@
 import { dialog } from './dialog.js';
 import { room } from '../room/room.js';
 
+const ICONS = {
+    arrowRight: '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M6 4l4 4-4 4z"/></svg>',
+    arrowDown: '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 6l4 4 4-4z"/></svg>',
+    folder: '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M7.17 2L9 3.83 14 3.83C14.55 3.83 15 4.28 15 4.83L15 13.17C15 13.72 14.55 14.17 14 14.17L2 14.17C1.45 14.17 1 13.72 1 13.17L1 2.83C1 2.28 1.45 1.83 2 1.83L7.17 1.83z"/></svg>', 
+    folderOpen: '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M14 4l-1-1H7L5.5 1H2a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1z"/></svg>',
+    file: '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M10.5 1H3a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V4.5L10.5 1zM11 5V2.5L13.5 5H11z"/></svg>',
+    json: '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M10.5 1H3a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V4.5L10.5 1zM11 5V2.5L13.5 5H11z"/><path d="M5.5 11.5v-1h1v-1h-1v-1h1v-1h-1v-1h2v5h-2z" fill="#fff"/></svg>'
+};
+
 export const explorer = {
     rootPath: null,
     currentFilePath: null,
@@ -14,6 +23,7 @@ export const explorer = {
         const fileMenuOpen = document.getElementById('fileMenuOpen');
         const fileMenuRename = document.getElementById('fileMenuRename');
         const fileMenuDelete = document.getElementById('fileMenuDelete');
+        const fileTree = document.getElementById('fileTree');
             
         if (openFolderBtn) {
             openFolderBtn.addEventListener('click', () => {
@@ -29,6 +39,13 @@ export const explorer = {
             newFolderBtn.addEventListener('click', () => {
                 this.createNewFolder();
             });
+        }
+        
+        // File Tree Drop Zone (Root)
+        if (fileTree) {
+            fileTree.addEventListener('dragover', (e) => this.handleContainerDragOver(e));
+            fileTree.addEventListener('dragleave', (e) => this.handleContainerDragLeave(e));
+            fileTree.addEventListener('drop', (e) => this.handleContainerDrop(e));
         }
         
         // File context menu
@@ -66,6 +83,15 @@ export const explorer = {
             if (exists) {
                 this.rootPath = lastFolder;
                 await this.refreshFileTree();
+                
+                // Load last opened file
+                const lastFile = localStorage.getItem('lastOpenedFile');
+                if (lastFile) {
+                    const fileExists = await window.electronAPI.pathExists(lastFile);
+                    if (fileExists) {
+                        await this.openFile(lastFile);
+                    }
+                }
             }
         }
 
@@ -77,11 +103,20 @@ export const explorer = {
     },
     
     setupSidebarResizer() {
-        const resizer = document.getElementById('sidebarResizer');
         const sidebar = document.getElementById('sidebar');
+        const handle = document.getElementById('sidebarResizeHandle');
+        
+        if (!sidebar || !handle) return;
+        
+        // Restore width
+        const savedWidth = localStorage.getItem('sidebarWidth');
+        if (savedWidth) {
+            sidebar.style.width = savedWidth + 'px';
+        }
+        
         let isResizing = false;
         
-        resizer.addEventListener('mousedown', (e) => {
+        handle.addEventListener('mousedown', (e) => {
             isResizing = true;
             document.body.style.cursor = 'ew-resize';
             e.preventDefault();
@@ -89,7 +124,10 @@ export const explorer = {
         
         document.addEventListener('mousemove', (e) => {
             if (!isResizing) return;
+            
             const newWidth = e.clientX;
+            
+            // Constraints
             if (newWidth >= 200 && newWidth <= 500) {
                 sidebar.style.width = newWidth + 'px';
             }
@@ -98,11 +136,12 @@ export const explorer = {
         document.addEventListener('mouseup', () => {
             if (isResizing) {
                 isResizing = false;
-                document.body.style.cursor = 'default';
+                document.body.style.cursor = '';
+                localStorage.setItem('sidebarWidth', parseInt(sidebar.style.width));
             }
         });
     },
-    
+
     async openFolder() {
         if (!window.electronAPI) {
             alert('File system access is only available in Electron');
@@ -163,31 +202,45 @@ export const explorer = {
     },
     
     createTreeItem(item, level) {
-        // Create tree item
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'tree-item';
-        itemDiv.style.paddingLeft = (level * 8 + 8) + 'px';
-        itemDiv.dataset.path = item.path;
+        // Create wrapper node
+        const nodeDiv = document.createElement('div');
+        nodeDiv.className = 'tree-node';
+
+        // Create header (the visible row)
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'tree-item-header';
+        headerDiv.style.paddingLeft = (level * 12 + 10) + 'px';
+        headerDiv.dataset.path = item.path;
+        headerDiv.dataset.type = item.isDirectory ? 'folder' : 'file';
+        headerDiv.draggable = true;
+        
+        // Drag events
+        headerDiv.addEventListener('dragstart', (e) => this.handleDragStart(e, item));
+        headerDiv.addEventListener('dragover', (e) => this.handleDragOver(e, item, headerDiv));
+        headerDiv.addEventListener('dragleave', (e) => this.handleDragLeave(e, headerDiv));
+        headerDiv.addEventListener('drop', (e) => this.handleDrop(e, item));
         
         // Expand arrow for directories
         const expandSpan = document.createElement('span');
         expandSpan.className = 'tree-item-expand';
         if (item.isDirectory) {
             const isExpanded = this.expandedFolders.has(item.path);
-            expandSpan.className += isExpanded ? ' expanded' : ' collapsed';
+            expandSpan.innerHTML = isExpanded ? ICONS.arrowDown : ICONS.arrowRight;
+            if (isExpanded) expandSpan.classList.add('expanded');
         } else {
-            expandSpan.className += ' no-children';
+            expandSpan.classList.add('no-children');
         }
         
         // Icon
         const iconSpan = document.createElement('span');
         iconSpan.className = 'tree-item-icon';
         if (item.isDirectory) {
-            iconSpan.textContent = '📁';
+            const isExpanded = this.expandedFolders.has(item.path);
+            iconSpan.innerHTML = isExpanded ? ICONS.folderOpen : ICONS.folder;
         } else if (item.name.endsWith('.json')) {
-            iconSpan.textContent = '📝';
+            iconSpan.innerHTML = ICONS.json;
         } else {
-            iconSpan.textContent = '📄';
+            iconSpan.innerHTML = ICONS.file;
         }
         
         // Label
@@ -195,49 +248,58 @@ export const explorer = {
         labelSpan.className = 'tree-item-label';
         labelSpan.textContent = item.name;
         
-        itemDiv.appendChild(expandSpan);
-        itemDiv.appendChild(iconSpan);
-        itemDiv.appendChild(labelSpan);
+        headerDiv.appendChild(expandSpan);
+        headerDiv.appendChild(iconSpan);
+        headerDiv.appendChild(labelSpan);
         
         // Event listeners
-        itemDiv.addEventListener('click', (e) => this.handleItemClick(item, itemDiv, level, e));
-        itemDiv.addEventListener('dblclick', (e) => this.handleItemDoubleClick(item, e));
-        itemDiv.addEventListener('contextmenu', (e) => this.handleItemContextMenu(item, itemDiv, e));
+        headerDiv.addEventListener('click', (e) => this.handleItemClick(item, nodeDiv, level, e));
+        headerDiv.addEventListener('dblclick', (e) => this.handleItemDoubleClick(item, e));
+        headerDiv.addEventListener('contextmenu', (e) => this.handleItemContextMenu(item, headerDiv, e));
         
+        nodeDiv.appendChild(headerDiv);
+
         // If directory is expanded, render its children
         if (item.isDirectory && this.expandedFolders.has(item.path)) {
             const childrenDiv = document.createElement('div');
             childrenDiv.className = 'tree-item-children';
-            itemDiv.appendChild(childrenDiv);
+            nodeDiv.appendChild(childrenDiv);
             this.renderDirectory(item.path, childrenDiv, level + 1);
         }
         
         // Highlight active file
         if (this.currentFilePath === item.path) {
-            itemDiv.classList.add('active-file');
+            headerDiv.classList.add('active-file');
         }
         
-        return itemDiv;
+        return nodeDiv;
     },
     
-    async handleItemClick(item, itemDiv, level, e) {
+    async handleItemClick(item, nodeDiv, level, e) {
         if (item.isDirectory) {
-            const expandSpan = itemDiv.querySelector('.tree-item-expand');
+            const expandSpan = nodeDiv.querySelector('.tree-item-expand');
+            const iconSpan = nodeDiv.querySelector('.tree-item-icon');
             const isExpanded = this.expandedFolders.has(item.path);
             
             if (isExpanded) {
                 this.expandedFolders.delete(item.path);
-                expandSpan.className = 'tree-item-expand collapsed';
-                const childrenDiv = itemDiv.querySelector('.tree-item-children');
+                expandSpan.innerHTML = ICONS.arrowRight;
+                expandSpan.classList.remove('expanded');
+                iconSpan.innerHTML = ICONS.folder;
+                
+                const childrenDiv = nodeDiv.querySelector('.tree-item-children');
                 if (childrenDiv) {
                     childrenDiv.remove();
                 }
             } else {
                 this.expandedFolders.add(item.path);
-                expandSpan.className = 'tree-item-expand expanded';
+                expandSpan.innerHTML = ICONS.arrowDown;
+                expandSpan.classList.add('expanded');
+                iconSpan.innerHTML = ICONS.folderOpen;
+
                 const childrenDiv = document.createElement('div');
                 childrenDiv.className = 'tree-item-children';
-                itemDiv.appendChild(childrenDiv);
+                nodeDiv.appendChild(childrenDiv);
                 await this.renderDirectory(item.path, childrenDiv, level + 1);
             }
         }
@@ -251,16 +313,16 @@ export const explorer = {
         }
     },
     
-    handleItemContextMenu(item, itemDiv, e) {
+    handleItemContextMenu(item, headerDiv, e) {
         e.preventDefault();
         e.stopPropagation();
         
         // Remove previous selection
-        document.querySelectorAll('.tree-item.selected').forEach(el => {
+        document.querySelectorAll('.tree-item-header.selected').forEach(el => {
             el.classList.remove('selected');
         });
         
-        itemDiv.classList.add('selected');
+        headerDiv.classList.add('selected');
         this.selectedItem = item;
         
         const menu = document.getElementById('fileContextMenu');
@@ -278,6 +340,7 @@ export const explorer = {
             
             // Set current file path BEFORE refreshing tree so the active-file class gets applied
             this.currentFilePath = filePath;
+            localStorage.setItem('lastOpenedFile', filePath);
             
             // Expand parent folders to make file visible
             this.expandParentFolders(filePath);
@@ -402,6 +465,7 @@ export const explorer = {
             
             if (this.currentFilePath === oldPath) {
                 this.currentFilePath = newPath;
+                localStorage.setItem('lastOpenedFile', newPath);
             }
             
             await this.refreshFileTree();
@@ -431,6 +495,7 @@ export const explorer = {
             
             if (this.currentFilePath === this.selectedItem.path) {
                 this.currentFilePath = null;
+                localStorage.removeItem('lastOpenedFile');
                 room.boxes = [];
                 room.arrows = [];
                 room.drawAll(); // Full render when clearing canvas
@@ -443,5 +508,117 @@ export const explorer = {
         }
         
         document.getElementById('fileContextMenu').style.display = 'none';
+    },
+
+    // Drag and Drop Handlers
+    handleDragStart(e, item) {
+        e.dataTransfer.setData('text/plain', JSON.stringify(item));
+        e.dataTransfer.effectAllowed = 'move';
+        e.stopPropagation();
+    },
+
+    handleDragOver(e, targetItem, targetDiv) {
+        e.preventDefault();
+
+        if (targetItem.isDirectory) {
+            targetDiv.classList.add('drag-over');
+            e.dataTransfer.dropEffect = 'move';
+        } else {
+            e.dataTransfer.dropEffect = 'none';
+        }
+    },
+
+    handleDragLeave(e, targetDiv) {
+        e.preventDefault();
+        e.stopPropagation();
+        targetDiv.classList.remove('drag-over');
+    },
+
+    async handleDrop(e, targetItem) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const targetDiv = e.target.closest('.tree-item-header');
+        if (targetDiv) targetDiv.classList.remove('drag-over');
+
+        if (!targetItem.isDirectory) return;
+
+        try {
+            const data = e.dataTransfer.getData('text/plain');
+            if (!data) return;
+            
+            const sourceItem = JSON.parse(data);
+            
+            // Prevent moving into self
+            if (sourceItem.path === targetItem.path) return;
+            
+            await this.moveFile(sourceItem, targetItem.path);
+        } catch (error) {
+            console.error('Drop error:', error);
+        }
+    },
+
+    handleContainerDragOver(e) {
+        e.preventDefault();
+        // Check if we are dragging over the container background (not a tree item)
+        // If the event target is the fileTree itself or something that isn't a tree-item
+        if (!e.target.closest('.tree-item-header')) {
+            document.getElementById('fileTree').classList.add('drag-over-container');
+            e.dataTransfer.dropEffect = 'move';
+        } else {
+            document.getElementById('fileTree').classList.remove('drag-over-container');
+        }
+    },
+
+    handleContainerDragLeave(e) {
+        e.preventDefault();
+        const fileTree = document.getElementById('fileTree');
+        if (!e.relatedTarget || !fileTree.contains(e.relatedTarget)) {
+             fileTree.classList.remove('drag-over-container');
+        }
+    },
+
+    async handleContainerDrop(e) {
+        e.preventDefault();
+        document.getElementById('fileTree').classList.remove('drag-over-container');
+        
+        // Only handle if dropped on the container directly (not on a child tree item)
+        if (e.target.closest('.tree-item-header')) return;
+        
+        if (!this.rootPath) return;
+
+        try {
+            const data = e.dataTransfer.getData('text/plain');
+            if (!data) return;
+            
+            const sourceItem = JSON.parse(data);
+            await this.moveFile(sourceItem, this.rootPath);
+        } catch (error) {
+            console.error('Container drop error:', error);
+        }
+    },
+
+    async moveFile(sourceItem, targetDirPath) {
+        if (!window.electronAPI) return;
+
+        const separator = targetDirPath.includes('\\') ? '\\' : '/';
+        const newPath = targetDirPath + separator + sourceItem.name;
+
+        // Prevent moving to same location
+        if (sourceItem.path === newPath) return;
+
+        try {
+            await window.electronAPI.renamePath(sourceItem.path, newPath);
+            
+            if (this.currentFilePath === sourceItem.path) {
+                this.currentFilePath = newPath;
+                localStorage.setItem('lastOpenedFile', newPath);
+            }
+            
+            await this.refreshFileTree();
+        } catch (error) {
+            console.error('Move error:', error);
+            alert('Failed to move file: ' + error.message);
+        }
     }
 };

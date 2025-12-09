@@ -78,8 +78,7 @@ export const controlEventHandler = {
         const color = e.currentTarget.dataset.color;
         const mgr = window.projection;
         if (mgr && color) {
-            mgr.bgColor = color;
-            mgr.renderProjection();
+            mgr.setBackgroundColor(color);
         }
     },
     
@@ -168,12 +167,23 @@ export const controlEventHandler = {
         control.triggeringMovement = true;
         control.mouseDownEvent = e;
         
+        // Check for scrollable target
+        const scrollable = e.target.closest('.controls-bar');
+        if (scrollable) {
+            control.scrollTarget = scrollable;
+            control.initialScrollLeft = scrollable.scrollLeft;
+            control.dragStartX = e.clientX;
+        } else {
+            control.scrollTarget = null;
+        }
+        
         // Clear any existing timeout
         if (control.holdTimeout) clearTimeout(control.holdTimeout);
 
         control.holdTimeout = setTimeout(() => {
             if (control.triggeringMovement) {
                 control.isDragging = true;
+                control.scrollTarget = null; // Disable scrolling if we start dragging container
                 control.dragStart.x = control.mouseDownEvent.clientX;
                 control.dragStart.y = control.mouseDownEvent.clientY;
                 
@@ -201,11 +211,15 @@ export const controlEventHandler = {
             
             control.element.style.left = (control.initialPos.x + dx) + 'px';
             control.element.style.top = (control.initialPos.y + dy) + 'px';
+        } else if (control.scrollTarget) {
+            const dx = e.clientX - control.dragStartX;
+            control.scrollTarget.scrollLeft = control.initialScrollLeft - dx;
         }
     },
 
     handleMouseUp(e) {
         control.triggeringMovement = false;
+        control.scrollTarget = null;
         if (control.holdTimeout) clearTimeout(control.holdTimeout);
         
         if (control.isDragging) {
