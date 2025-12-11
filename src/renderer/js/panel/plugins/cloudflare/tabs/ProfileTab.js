@@ -17,10 +17,34 @@ export class ProfileTab {
         this.container = container;
         this.renderUI();
         
+        // Ensure column visibility management if applicable, 
+        // though Profile is usually a single column.
+        // If we switch from multi-column view to Profile, we might need to clean up siblings?
+        // But CloudflarePlugin.js handles clearing container.innerHTML.
+        
+        // However, if we want to be consistent with Miller Columns style:
+        this.updateColumnVisibility();
+
         // If we have a token but no data, fetch it
         if (this.token && !this.state.user && !this.state.loading) {
             this.verifyToken();
         }
+    }
+
+    updateColumnVisibility() {
+        if (!this.container || !this.container.parentElement) return;
+        
+        const container = this.container.parentElement;
+        if (!container.children) return;
+
+        const columns = Array.from(container.children).filter(c => c.classList.contains('finder-column'));
+        
+        // Reset all to visible first
+        columns.forEach(c => c.style.display = '');
+
+        // For Profile tab, we typically only show this one column, 
+        // but if it were part of a deeper navigation, we'd manage it here.
+        // Currently, it's the root column for the "Profile" view.
     }
 
     renderUI() {

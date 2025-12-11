@@ -27,6 +27,7 @@ export const room = {
 
     dragOffset: { x: 0, y: 0 },
     lastMousePos: { x: 0, y: 0 },
+    currentMousePos: { x: 0, y: 0 },
 
     selectionStart: null,
     selectionRect: null,
@@ -922,6 +923,9 @@ export const room = {
             if (isSelected) {
                 boxDiv.classList.add('selected');
             }
+            if (room.editingBox === box) {
+                boxDiv.classList.add('editing');
+            }
 
             boxDiv.style.left = (box.x + room.offset.x) + 'px';
             boxDiv.style.top = (box.y + room.offset.y) + 'px';
@@ -1004,6 +1008,11 @@ export const room = {
                 boxDiv.appendChild(tagDot);
             }
 
+            if (box.type === 'book') {
+                const linkIcon = room.createBookLinkIcon(box);
+                boxDiv.appendChild(linkIcon);
+            }
+
             const roomDiv = room.element;
             roomDiv.appendChild(boxDiv);
 
@@ -1040,6 +1049,14 @@ export const room = {
                 if (existingTagDot.style.background !== box.tag.color) {
                     existingTagDot.style.background = box.tag.color;
                 }
+            }
+            
+            const existingLinkIcon = boxDiv.querySelector('.book-link-icon');
+            if (box.type === 'book' && !existingLinkIcon) {
+                const linkIcon = room.createBookLinkIcon(box);
+                boxDiv.appendChild(linkIcon);
+            } else if (box.type !== 'book' && existingLinkIcon) {
+                existingLinkIcon.remove();
             }
             
             // Redraw arrows connected to this box
@@ -1103,6 +1120,21 @@ export const room = {
                 }
             }
         }
+    },
+
+    createBookLinkIcon(box) {
+        const icon = document.createElement('div');
+        icon.className = 'book-link-icon';
+        icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" /></svg>';
+        
+        icon.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+        
+        icon.addEventListener('mousedown', (e) => e.stopPropagation());
+        icon.addEventListener('dblclick', (e) => e.stopPropagation());
+
+        return icon;
     },
 
     createTagDotElement(color, box) {
@@ -1352,15 +1384,50 @@ export const room = {
         });
     },
 
-    updateCursorStyle(target) {
+    getResizeDirection(box, x, y) {
+        const margin = 8;
+        const lx = x - box.x;
+        const ly = y - box.y;
+        const w = box.width;
+        const h = box.height;
+
+        const onLeft = lx < margin;
+        const onRight = lx > w - margin;
+        const onTop = ly < margin;
+        const onBottom = ly > h - margin;
+
+        if (onTop && onLeft) return 'nw';
+        if (onTop && onRight) return 'ne';
+        if (onBottom && onLeft) return 'sw';
+        if (onBottom && onRight) return 'se';
+        if (onTop) return 'n';
+        if (onBottom) return 's';
+        if (onLeft) return 'w';
+        if (onRight) return 'e';
+        return null;
+    },
+
+    updateCursorStyle(target, pos) {
         if (target.closest('.box-text-container')) {
             room.element.style.cursor = 'default';
         } else if (target.closest('.box-arrow-container')) {
             room.element.style.cursor = 'crosshair';
         } else if (target.closest('.box')) {
+            const boxDiv = target.closest('.box');
+            if (boxDiv && boxDiv.owner && pos) {
+                const dir = this.getResizeDirection(boxDiv.owner, pos.x, pos.y);
+                if (dir) {
+                    room.element.style.cursor = dir + '-resize';
+                    return;
+                }
+            }
             room.element.style.cursor = 'move';
         } else {
-            room.element.style.cursor = 'default';
+            if (this.findArrowAt(pos)) {
+                room.element.style.cursor = 'crosshair';
+            } else {
+                room.element.style.cursor = 'default';
+            }
         }
     },
 
@@ -1464,6 +1531,9 @@ export const room = {
 
     startEditing(box) {
         room.editingBox = box;
+        if (box.element) {
+            box.element.classList.add('editing');
+        }
         const textDiv = room.editingBox.element.querySelector('.box-text');
         // If it's a markdown box, switch to source text for editing
         if (box.type === 'markdown') {
@@ -1485,7 +1555,11 @@ export const room = {
 
     finishEditing() {
         if (!room.editingBox) return;
+
         if (room.editingBox !== room.selectedBox) {
+            if (room.editingBox.element) {
+                room.editingBox.element.classList.remove('editing');
+            }
             const textDiv = room.editingBox.element.querySelector('.box-text');
             // If it's a markdown box, switch back to rendered view
             if (room.editingBox.type === 'markdown') {
@@ -1531,20 +1605,20 @@ export const room = {
         
         if (!textContainer || !textDiv) return;
 
-        // Calculate the required width and height based on scrollWidth/scrollHeight
-        // textContainer has padding: top: 12px, left: 12px, right: 12px, bottom: 12px
-        // textDiv has padding: left: 5px, right: 5px
-        const containerPadding = 36; // 12px left + 12px right (and same for top/bottom)
+        // Based on room.css:
+        // Horizontal: border-left (1) + left (6) + right (6) + border-right (1) = 14px
+        const horizontalPadding = 18;
         
-
+        // Vertical: border-top (1) + top (9) + bottom (6) + border-bottom (1) = 17px
+        const verticalPadding = 21;
         
         // Get the scroll dimensions
         const scrollWidth = textDiv.scrollWidth;
         const scrollHeight = textDiv.scrollHeight;
+        console.log('scrollWidth:', scrollWidth, 'scrollHeight:', scrollHeight);
         
-        // Calculate new dimensions with padding
-        const newWidth = scrollWidth + containerPadding + 2;
-        const newHeight = scrollHeight + containerPadding + 2;
+        const newWidth = scrollWidth + horizontalPadding;
+        const newHeight = scrollHeight + verticalPadding;
         
         // Update box dimensions
         box.width = Math.max(room.minBoxWidth, newWidth);
@@ -1627,8 +1701,8 @@ export const room = {
         this.clipboard.boxes.forEach(boxData => {
             const newBox = {
                 id: Date.now() + Math.random(),
-                x: this.lastMousePos.x + boxData.offsetX + offsetX,
-                y: this.lastMousePos.y + boxData.offsetY + offsetY,
+                x: (this.currentMousePos ? this.currentMousePos.x : 0) + boxData.offsetX + offsetX,
+                y: (this.currentMousePos ? this.currentMousePos.y : 0) + boxData.offsetY + offsetY,
                 width: boxData.width,
                 height: boxData.height,
                 defaultWidth: boxData.defaultWidth,
@@ -1946,6 +2020,7 @@ export const room = {
         });
         
         return {
+            offset: { ...room.offset },
             boxes: room.boxes.map(box => ({
                 id: box.id,
                 x: box.x,
@@ -1967,7 +2042,7 @@ export const room = {
 
     deserializeState(state) {
         if (!state) {
-            return { boxes: [], arrows: [] };
+            return { boxes: [], arrows: [], offset: { x: 0, y: 0 } };
         }
         if (!Array.isArray(state.boxes)) {
             state.boxes = [];
@@ -2019,7 +2094,7 @@ export const room = {
             }
         });
         
-        return { boxes };
+        return { boxes, offset: state.offset };
     },
 
     markClean() {
@@ -2041,6 +2116,12 @@ export const room = {
 
         const deserialized = this.deserializeState(state);
         room.boxes = deserialized.boxes;
+        
+        if (deserialized.offset) {
+            room.offset = deserialized.offset;
+        } else {
+            room.offset = { x: 0, y: 0 };
+        }
 
         room.selectedBox = null;
         room.selectedBoxes = [];
@@ -2203,5 +2284,6 @@ export const room = {
         
         // Redraw everything with the new offset (this pans the view)
         this.drawAll(false);
+        this.saveState();
     }
 };

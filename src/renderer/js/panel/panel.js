@@ -1,5 +1,6 @@
 import { PanelManager } from './PanelManager.js';
 import { CloudflarePlugin } from './plugins/cloudflare/CloudflarePlugin.js';
+import { TelegramPlugin } from './plugins/telegram/TelegramPlugin.js';
 
 const manager = new PanelManager('panel-layer');
 
@@ -26,6 +27,7 @@ export const panel = {
 
         // Register Plugins
         manager.registerPlugin(new CloudflarePlugin());
+        manager.registerPlugin(new TelegramPlugin());
         
         // If we want to expose the manager globally for debugging
         window.panelManager = manager;

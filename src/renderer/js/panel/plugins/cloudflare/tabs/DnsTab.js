@@ -61,7 +61,11 @@ export class DnsTab {
     }
 
     updateColumnVisibility() {
+        if (!this.container || !this.container.parentElement) return;
+        
         const container = this.container.parentElement;
+        if (!container.children) return;
+
         const columns = Array.from(container.children).filter(c => c.classList.contains('finder-column'));
         
         // Reset all to visible first

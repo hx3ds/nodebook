@@ -58,22 +58,28 @@
     z-index: 31;
 }
 
+.box.editing {
+    border: 1px solid #1a73e8;
+    box-shadow: 0 0 0 4px rgba(26, 115, 232, 0.3);
+    z-index: 32;
+}
+
 .box-arrow-container {
     position: absolute;
-    top: 6px;
-    left: 6px;
-    right: 6px;
-    bottom: 6px;
-    border-radius: 6px;
+    top: 2px;
+    left: 2px;
+    right: 2px;
+    bottom: 2px;
+    border-radius: 2px;
     pointer-events: auto;
 }
 
 .box-text-container {
     position: absolute;
-    top: 12px;
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
+    top: 9px;
+    left: 6px;
+    right: 6px;
+    bottom: 6px;
     overflow: auto;
     pointer-events: auto;
 }
@@ -97,17 +103,17 @@
 }
 
 .box-text {
-    min-height: 40px;
-    min-width: 120px;
+    min-height: 59px;
+    min-width: 142px;
     font-size: 15px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     color: #3c4043;
     line-height: 20px;
     white-space: pre-wrap;
-    user-select: text;
-    -webkit-user-select: text;
-    -moz-user-select: text;
-    -ms-user-select: text;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
     cursor: text;
     pointer-events: auto;
     width: 100%;
@@ -119,16 +125,45 @@
     outline: none;
 }
 
+.box.selected .box-text,
+.box.editing .box-text {
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+}
+
 .tag-dot {
     position: absolute;
-    top: 6px;
-    left: 6px;
-    width: 12px;
-    height: 12px;
+    top: 3px;
+    left: 3px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     border: 1px solid rgba(0, 0, 0, 0.1);
     pointer-events: auto;
     z-index: 31;
+}
+
+.book-link-icon {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 10px;
+    height: 10px;
+    cursor: default;
+    z-index: 31;
+    color: #5f6368;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+}
+
+.book-link-icon svg {
+    width: 100%;
+    height: 100%;
+    /* fill: currentColor; */
 }
 
 /* Box Context Menu */

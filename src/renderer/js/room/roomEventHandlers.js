@@ -5,10 +5,17 @@ import { panel } from '../panel/panel.js';
 export const roomEventHandlers = {
     // Main event handlers
     handleDblClick(e) {
-        e.stopPropagation();
-        e.preventDefault();
         const pos = room.getMousePos(e);
         const { owner, elementType } = room.getElementOwner(e.target, pos);
+
+        // If we are currently editing this box, allow default double-click behavior (word selection)
+        if (room.editingBox && room.editingBox === owner) {
+            return;
+        }
+
+        e.stopPropagation();
+        e.preventDefault();
+
         switch (elementType) {
             case 'box-text-container':
             case 'box-arrow-container':
@@ -94,10 +101,17 @@ export const roomEventHandlers = {
                         room.connectingTo = null;
                         break;
                     case 'box':
-                        registerEvent('resizingBox')
-                        room.selectBox(owner, ifAppend);
-                        room.lastMousePos = pos;
-                        room.resizingBox = owner;
+                        if (e.target.classList.contains('tag-dot')) {
+                            registerEvent('selectingBox');
+                            room.selectBox(owner, ifAppend);
+                        } else {
+                            registerEvent('resizingBox')
+                            room.triggeringMovement = false;
+                            room.selectBox(owner, ifAppend);
+                            room.lastMousePos = pos;
+                            room.resizingBox = owner;
+                            room.resizeDirection = room.getResizeDirection(owner, pos.x, pos.y);
+                        }
                         break;
                     case 'arrow':
                         registerEvent('selectingArrow')
@@ -167,10 +181,11 @@ export const roomEventHandlers = {
     handleMouseMove(e) {
         room.triggeringMovement = false;
         const pos = room.getMousePos(e);
+        room.currentMousePos = pos;
         const { owner, elementType } = room.getElementOwner(e.target, pos);
 
         if (!room.inEvent) {
-            room.updateCursorStyle(e.target);
+            room.updateCursorStyle(e.target, pos);
             return;
         }
 
@@ -191,10 +206,29 @@ export const roomEventHandlers = {
             case 'resizingBox':
                 const dw = pos.x - room.lastMousePos.x;
                 const dh = pos.y - room.lastMousePos.y;
-                const newWidth = Math.max(room.minBoxWidth, room.resizingBox.width + dw);
-                const newHeight = Math.max(room.minBoxHeight, room.resizingBox.height + dh);
-                room.resizingBox.width = newWidth;
-                room.resizingBox.height = newHeight;
+                const dir = room.resizeDirection || 'se';
+
+                if (dir.includes('e')) {
+                    const newWidth = Math.max(room.minBoxWidth, room.resizingBox.width + dw);
+                    room.resizingBox.width = newWidth;
+                }
+                if (dir.includes('w')) {
+                    const newWidth = Math.max(room.minBoxWidth, room.resizingBox.width - dw);
+                    const change = newWidth - room.resizingBox.width;
+                    room.resizingBox.x -= change;
+                    room.resizingBox.width = newWidth;
+                }
+                if (dir.includes('s')) {
+                    const newHeight = Math.max(room.minBoxHeight, room.resizingBox.height + dh);
+                    room.resizingBox.height = newHeight;
+                }
+                if (dir.includes('n')) {
+                    const newHeight = Math.max(room.minBoxHeight, room.resizingBox.height - dh);
+                    const change = newHeight - room.resizingBox.height;
+                    room.resizingBox.y -= change;
+                    room.resizingBox.height = newHeight;
+                }
+
                 room.drawBox(room.resizingBox, false);
                 room.lastMousePos = pos;
                 break;
@@ -272,6 +306,7 @@ export const roomEventHandlers = {
                     room.pushHistory();
                     room.saveState();
                     room.resizingBox = null;
+                    room.resizeDirection = null;
                 }
                 room.lastMousePos = null;
                 break;
@@ -310,6 +345,7 @@ export const roomEventHandlers = {
             case 'panning':
                 room.element.style.cursor = 'default';
                 room.lastPanPos = { x: 0, y: 0 };
+                room.saveState();
                 break;
         }
 
@@ -340,6 +376,7 @@ export const roomEventHandlers = {
                         room.pushHistory();
                         room.saveState();
                         room.resizingBox = null;
+                        room.resizeDirection = null;
                     }
                     break;
                 case 'movingBox':
@@ -349,6 +386,7 @@ export const roomEventHandlers = {
                     break;
                 case 'panning':
                     // Just reset cursor
+                    room.saveState();
                     break;
             }
         }
@@ -546,6 +584,7 @@ function wrapEvent() {
                     room.pushHistory();
                     room.saveState();
                     room.resizingBox = null;
+                    room.resizeDirection = null;
                 }
                 room.lastMousePos = null;
             }
@@ -623,7 +662,11 @@ function wrapEvent() {
             if (room.last_event === 'editingBox') {
                 room.finishEditing();
             }
-            room.element.style.cursor = 'nwse-resize';
+            if (room.resizeDirection) {
+                room.element.style.cursor = room.resizeDirection + '-resize';
+            } else {
+                room.element.style.cursor = 'nwse-resize';
+            }
             break;
 
         case 'selectingArrow':

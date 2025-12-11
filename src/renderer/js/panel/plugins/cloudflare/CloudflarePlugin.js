@@ -8,7 +8,7 @@ export class CloudflarePlugin {
         this.id = 'cloudflare';
         
         // State
-        this.activeNavId = 'tunnels'; // Default to something useful
+        this.activeNavId = 'tunnels'; // Legacy/Default
         this.apiToken = localStorage.getItem('cf_api_token') || '';
         this.apiEmail = localStorage.getItem('cf_api_email') || '';
         
@@ -37,6 +37,44 @@ export class CloudflarePlugin {
         // Called when plugin becomes active
     }
 
+    // New Interface for Multi-Tabs
+    renderTab(tabId, container) {
+        // Redirect if not connected (unless it's profile)
+        if (tabId !== 'profile' && !this.apiToken) {
+            // In a tabbed interface, we might want to show a "Please Connect" message 
+            // instead of redirecting the whole tab content to Profile,
+            // or just render Profile here.
+            // Let's render a simple message linking to Profile.
+            container.innerHTML = `
+                <div style="padding: 20px; text-align: center; color: #666;">
+                    <h3>Authentication Required</h3>
+                    <p>Please configure your API Token in the <b>Profile</b> tab first.</p>
+                </div>
+            `;
+            return;
+        }
+
+        if (!this.tabs[tabId]) {
+            this.initTabInstance(tabId);
+        }
+
+        // With multi-tabs, the container is exclusive to this tab.
+        // We create the root column inside it.
+        container.innerHTML = '';
+        const col = this.createColumn(container);
+        
+        // Render the specific tab instance
+        // Note: 'tunnels' vs 'tunnel' mismatch handling
+        const instance = this.tabs[tabId] || (tabId === 'tunnels' ? this.tabs.tunnels : null);
+        
+        if (instance) {
+            instance.render(col);
+        } else {
+            container.innerHTML = 'Tab not found';
+        }
+    }
+
+    // Legacy render for backward compatibility if needed, or initial view
     render(container) {
         this.container = container;
         this.renderColumnView();
@@ -48,22 +86,7 @@ export class CloudflarePlugin {
 
         // Determine which Tab to render as the first "Content" column
         const tabId = this.activeNavId;
-        
-        if (tabId !== 'profile' && !this.apiToken) {
-            // Show Profile if not connected
-            this.activeNavId = 'profile';
-            this.initTabInstance('profile');
-            this.tabs.profile.render(this.createColumn(this.container));
-            return;
-        }
-
-        if (!this.tabs[tabId]) {
-            this.initTabInstance(tabId);
-        }
-
-        // Render the active tab into a new column
-        const col = this.createColumn(this.container);
-        this.tabs[tabId].render(col);
+        this.renderTab(tabId, this.container);
     }
 
     createColumn(parent) {
@@ -86,11 +109,9 @@ export class CloudflarePlugin {
                 this.tabs.dns = new DnsTab(this.apiToken, this.apiEmail);
                 break;
             case 'tunnels':
-                // Note: ID mismatch fix, user uses 'tunnels' in nav but 'tunnel' in logic? 
-                // Let's stick to 'tunnels' for nav ID and 'tunnel' for internal var if needed.
                 this.tabs.tunnels = new TunnelTab(this.apiToken, this.apiEmail);
-                // Map the instance correctly if needed, but I'll use the ID 'tunnels' here on out
-                this.tabs[tabId] = this.tabs.tunnels; 
+                // Map it if needed
+                if (tabId === 'tunnels') this.tabs[tabId] = this.tabs.tunnels;
                 break;
         }
     }
