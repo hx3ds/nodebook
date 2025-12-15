@@ -53,7 +53,7 @@ export class PanelManager {
                 </div>
                 <div class="panel-right-side" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
                     <div class="panel-tabs-bar" style="
-                        height: 35px; background: #f0f0f0; border-bottom: 1px solid #ddd; 
+                        min-height: 35px; background: #f0f0f0; border-bottom: 1px solid #ddd; 
                         display: flex; align-items: flex-end; padding-left: 10px; gap: 5px;
                     ">
                         <!-- Tabs -->
@@ -156,7 +156,16 @@ export class PanelManager {
             container: null // Will be created in renderContent
         };
         
-        this.openTabs.push(newTab);
+        // Find insertion index to group tabs of same plugin
+        let insertIndex = this.openTabs.length;
+        for (let i = this.openTabs.length - 1; i >= 0; i--) {
+            if (this.openTabs[i].pluginId === plugin.id) {
+                insertIndex = i + 1;
+                break;
+            }
+        }
+        
+        this.openTabs.splice(insertIndex, 0, newTab);
         this.activateTab(tabId);
     }
 
@@ -204,48 +213,101 @@ export class PanelManager {
         if (!container) return;
         container.innerHTML = '';
 
+        // Group tabs by plugin
+        const groups = [];
         this.openTabs.forEach(tab => {
-            const isActive = this.activeTabId === tab.id;
-            const tabEl = document.createElement('div');
-            tabEl.className = `panel-tab ${isActive ? 'active' : ''}`;
-            // Inline styles for now, move to CSS later if needed
-            Object.assign(tabEl.style, {
-                padding: '6px 12px',
-                background: isActive ? 'white' : '#e0e0e0',
-                border: '1px solid #ddd',
-                borderBottom: isActive ? '1px solid white' : '1px solid #ddd',
-                borderRadius: '4px 4px 0 0',
-                cursor: 'pointer',
+            let group = groups.find(g => g.pluginId === tab.pluginId);
+            if (!group) {
+                group = { pluginId: tab.pluginId, pluginName: tab.plugin.name, tabs: [] };
+                groups.push(group);
+            }
+            group.tabs.push(tab);
+        });
+
+        groups.forEach(group => {
+            const groupEl = document.createElement('div');
+            groupEl.className = 'tab-group';
+            Object.assign(groupEl.style, {
                 display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '0.9em',
-                userSelect: 'none',
-                marginBottom: '-1px', // overlap border
-                minWidth: '100px',
-                maxWidth: '200px'
+                flexDirection: 'column', // Stack header above tabs
+                alignItems: 'stretch',
+                border: '1px solid #ccc',
+                borderRadius: '6px 6px 0 0',
+                marginRight: '8px',
+                background: '#e8e8e8',
+                overflow: 'hidden'
             });
 
-            tabEl.innerHTML = `
-                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${tab.label}</span>
-                <span class="close-tab" style="
-                    font-size: 10px; width: 14px; height: 14px; display: flex; 
-                    align-items: center; justify-content: center; border-radius: 50%;
-                    color: #666;
-                ">✕</span>
-            `;
+            // Group Header (Plugin Name)
+            const headerEl = document.createElement('div');
+            headerEl.textContent = group.pluginName;
+            Object.assign(headerEl.style, {
+                padding: '2px 8px',
+                fontSize: '0.7em',
+                fontWeight: 'bold',
+                color: '#666',
+                background: '#f5f5f5',
+                borderBottom: '1px solid #ccc',
+                textAlign: 'center',
+                userSelect: 'none'
+            });
+            groupEl.appendChild(headerEl);
 
-            tabEl.addEventListener('click', () => this.activateTab(tab.id));
-            
-            const closeBtn = tabEl.querySelector('.close-tab');
-            closeBtn.addEventListener('mouseover', () => { closeBtn.style.background = '#ccc'; closeBtn.style.color = 'black'; });
-            closeBtn.addEventListener('mouseout', () => { closeBtn.style.background = 'transparent'; closeBtn.style.color = '#666'; });
-            closeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.closeTab(tab.id);
+            // Tabs Container
+            const tabsContainer = document.createElement('div');
+            Object.assign(tabsContainer.style, {
+                display: 'flex'
             });
 
-            container.appendChild(tabEl);
+            group.tabs.forEach(tab => {
+                const isActive = this.activeTabId === tab.id;
+                const tabEl = document.createElement('div');
+                tabEl.className = `panel-tab ${isActive ? 'active' : ''}`;
+                Object.assign(tabEl.style, {
+                    padding: '6px 12px',
+                    background: isActive ? 'white' : 'transparent',
+                    borderRight: '1px solid #ccc',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '0.9em',
+                    userSelect: 'none',
+                    minWidth: '80px',
+                    maxWidth: '200px',
+                    boxSizing: 'border-box'
+                });
+                
+                // Remove right border for last tab
+                if (tab === group.tabs[group.tabs.length - 1]) {
+                    tabEl.style.borderRight = 'none';
+                }
+
+                tabEl.innerHTML = `
+                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${tab.label}</span>
+                    <span class="close-tab" style="
+                        font-size: 10px; width: 14px; height: 14px; display: flex; 
+                        align-items: center; justify-content: center; border-radius: 50%;
+                        color: #666;
+                        margin-left: auto;
+                    ">✕</span>
+                `;
+
+                tabEl.addEventListener('click', () => this.activateTab(tab.id));
+                
+                const closeBtn = tabEl.querySelector('.close-tab');
+                closeBtn.addEventListener('mouseover', () => { closeBtn.style.background = '#ccc'; closeBtn.style.color = 'black'; });
+                closeBtn.addEventListener('mouseout', () => { closeBtn.style.background = 'transparent'; closeBtn.style.color = '#666'; });
+                closeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.closeTab(tab.id);
+                });
+
+                tabsContainer.appendChild(tabEl);
+            });
+
+            groupEl.appendChild(tabsContainer);
+            container.appendChild(groupEl);
         });
     }
 

@@ -1,7 +1,10 @@
 const { ipcMain, dialog } = require('electron');
 const fs = require('fs').promises;
 const path = require('path');
+const { exec, spawn } = require('child_process');
 const { getMainWindow } = require('./window');
+
+const activeProcesses = new Map();
 
 function setupIpcHandlers() {
     // Dialog handlers
@@ -114,6 +117,62 @@ function setupIpcHandlers() {
         } catch {
             return false;
         }
+    });
+
+    // Process execution
+    ipcMain.handle('exec-command', (event, command) => {
+        return new Promise((resolve) => {
+            exec(command, { maxBuffer: 1024 * 1024 * 50 }, (error, stdout, stderr) => {
+                resolve({ 
+                    error: error ? error.message : null, 
+                    stdout, 
+                    stderr,
+                    code: error ? error.code : 0
+                });
+            });
+        });
+    });
+
+    ipcMain.handle('spawn-command', (event, id, command, args) => {
+        try {
+            // shell: true allows running command as typed in shell, 
+            // helpful for resolving PATH but args need to be handled carefully if shell:true
+            const child = spawn(command, args, { shell: true });
+            
+            activeProcesses.set(id, child);
+
+            child.stdout.on('data', (data) => {
+                event.sender.send('process-event', { id, type: 'stdout', data: data.toString() });
+            });
+
+            child.stderr.on('data', (data) => {
+                event.sender.send('process-event', { id, type: 'stderr', data: data.toString() });
+            });
+
+            child.on('close', (code) => {
+                event.sender.send('process-event', { id, type: 'close', code });
+                activeProcesses.delete(id);
+            });
+            
+            child.on('error', (err) => {
+                event.sender.send('process-event', { id, type: 'error', error: err.message });
+                activeProcesses.delete(id);
+            });
+
+            return { success: true };
+        } catch (e) {
+            return { success: false, error: e.message };
+        }
+    });
+
+    ipcMain.handle('kill-process', (event, id) => {
+        const child = activeProcesses.get(id);
+        if (child) {
+            child.kill();
+            activeProcesses.delete(id);
+            return { success: true };
+        }
+        return { success: false, error: 'Process not found' };
     });
 }
 

@@ -1,3 +1,6 @@
+import { TelegramMethods } from './TelegramDefinitions.js';
+import { UI } from '../../../ui/index.js';
+
 export class BotsTab {
     constructor({ bots, activeBotToken, onAdd, onRemove, onSelect }) {
         this.bots = bots;
@@ -14,18 +17,13 @@ export class BotsTab {
             
             // Console state
             method: 'getMe',
-            params: '{}',
+            paramValues: {},
             response: null,
             consoleLoading: false,
             consoleError: null
         };
 
-        this.commonMethods = [
-            'getMe', 'getUpdates', 'setWebhook', 'deleteWebhook', 'getWebhookInfo',
-            'sendMessage', 'forwardMessage', 'sendPhoto', 'sendAudio', 'sendDocument',
-            'sendVideo', 'sendAnimation', 'sendVoice', 'sendVideoNote', 'sendMediaGroup',
-            'sendLocation', 'editMessageText', 'editMessageCaption', 'deleteMessage'
-        ];
+        this.commonMethods = Object.keys(TelegramMethods);
     }
 
     render(container) {
@@ -49,19 +47,13 @@ export class BotsTab {
         this.renderListColumn(listColumn);
 
         // Manage dynamic columns
-        // Cleanup existing next columns
-        let next = listColumn.nextElementSibling;
-        while(next) {
-            const toRemove = next;
-            next = next.nextElementSibling;
-            toRemove.remove();
-        }
+        UI.Layout.clearSiblings(listColumn);
 
         if (this.state.isAdding) {
-            const addColumn = this.createColumn(listColumn.parentElement);
+            const addColumn = UI.Layout.createColumn(listColumn.parentElement);
             this.renderAddColumn(addColumn);
         } else if (this.activeBotToken) {
-            const consoleColumn = this.createColumn(listColumn.parentElement);
+            const consoleColumn = UI.Layout.createColumn(listColumn.parentElement);
             this.renderConsoleColumn(consoleColumn);
         }
         
@@ -70,71 +62,46 @@ export class BotsTab {
 
     updateColumnVisibility() {
         if (!this.container || !this.container.parentElement) return;
-        
-        const container = this.container.parentElement;
-        if (!container.children) return;
-
-        const columns = Array.from(container.children).filter(c => c.classList.contains('finder-column'));
-        
-        // Reset all to visible first
-        columns.forEach(c => c.style.display = '');
-
-        if (columns.length > 2) {
-            // Hide the first one (List)
-            columns[0].style.display = 'none';
-        }
-    }
-
-    createColumn(parent) {
-        const col = document.createElement('div');
-        col.className = 'finder-column animate-in';
-        parent.appendChild(col);
-        return col;
+        UI.Layout.updateVisibility(this.container.parentElement);
     }
 
     renderListColumn(col) {
         const { loading, error } = this.state;
         
         col.innerHTML = `
-            <div class="column-header">
-                <span>Telegram Bots</span>
-                ${loading ? '<span style="font-size:0.8em; color:#888;">Loading...</span>' : ''}
-            </div>
-            <div class="column-content">
-                ${error ? `<div style="padding: 10px; color: #c62828;">${error}</div>` : ''}
+            ${UI.Header({ 
+                title: 'Telegram Bots',
+                actions: loading ? '<span style="font-size:12px; color:#586069;">Loading...</span>' : ''
+            })}
+            <div class="ui-content">
+                ${error ? UI.Error({ message: error }) : ''}
                 
-                <div class="bot-list">
-                    ${this.bots.map(bot => {
-                        const isActive = bot.token === this.activeBotToken;
-                        const info = bot.info || {};
-                        const name = info.first_name || 'Unknown Bot';
-                        const username = info.username ? `@${info.username}` : 'No username';
-                        
-                        return `
-                            <div class="list-item ${isActive ? 'active' : ''}" data-token="${bot.token}">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span style="font-weight: 500;">${name}</span>
-                                    ${isActive ? '<div style="width: 8px; height: 8px; border-radius: 50%; background: #0088cc;"></div>' : ''}
-                                </div>
-                                <div style="font-size: 0.8em; opacity: 0.7; margin-top: 2px;">${username}</div>
-                            </div>
-                        `;
-                    }).join('')}
+                ${this.bots.length === 0 ? `<div class="ui-empty" style="padding: 20px; color: #888; text-align: center;">No bots added</div>` : ''}
+
+                ${this.bots.map(bot => {
+                    const isActive = bot.token === this.activeBotToken;
+                    const info = bot.info || {};
+                    const name = info.first_name || 'Unknown Bot';
+                    const username = info.username ? `@${info.username}` : 'No username';
                     
-                    ${this.bots.length === 0 ? '<div style="padding: 15px; color: #888; font-style: italic;">No bots added.</div>' : ''}
-                    
-                    <div style="padding: 10px;">
-                       <button id="add-bot-btn" style="width: 100%; padding: 6px; cursor: pointer;">+ Add Bot</button>
-                    </div>
+                    return UI.ListItem({
+                        id: bot.token,
+                        title: name,
+                        subtitle: username,
+                        selected: isActive
+                    });
+                }).join('')}
+                
+                <div style="padding: 20px;">
+                   ${UI.Button({ id: 'add-bot-btn', label: '+ Add Bot', style: 'width: 100%' })}
                 </div>
             </div>
         `;
 
-        col.querySelectorAll('.list-item').forEach(el => {
+        col.querySelectorAll('.ui-list-item').forEach(el => {
             el.addEventListener('click', () => {
                 this.state.isAdding = false;
-                this.onSelect(el.dataset.token);
-                // onSelect updates the plugin state which calls update() on this tab
+                this.onSelect(el.dataset.id);
             });
         });
         
@@ -151,30 +118,34 @@ export class BotsTab {
         const { loading, error } = this.state;
         
         col.innerHTML = `
-            <div class="column-header">
-                <span>Add Bot</span>
-                <button id="close-add-btn" style="padding: 4px 8px; font-size: 11px; cursor: pointer; background: transparent; border: 1px solid #ddd; border-radius: 3px;">✕</button>
-            </div>
-            <div class="column-content" style="padding: 20px;">
+            ${UI.Header({ 
+                title: 'Add Bot',
+                actions: UI.CloseButton({ id: 'close-add-btn' })
+            })}
+            <div class="ui-content padded">
                 <div style="margin-bottom: 20px;">
-                    <label style="display: block; font-size: 0.85em; margin-bottom: 5px; color: #666;">Bot Token</label>
-                    <input type="text" id="tg-token-input" 
-                        placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-                        value="${this.state.addTokenInput}"
-                        style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+                    ${UI.FormGroup({
+                        label: 'Bot Token',
+                        control: UI.Input({ 
+                            id: 'tg-token-input',
+                            value: this.state.addTokenInput,
+                            placeholder: '123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11'
+                        })
+                    })}
                     <div style="margin-top: 5px; font-size: 0.75em; color: #888;">
                         Obtain a token from <a href="#" onclick="window.open('https://t.me/BotFather', '_blank'); return false;">@BotFather</a>.
                     </div>
                 </div>
 
-                ${error ? `<div style="color: #c62828; font-size: 0.9em; margin-bottom: 10px;">${error}</div>` : ''}
+                ${error ? UI.Error({ message: error }) : ''}
 
                 <div style="margin-top: 20px;">
-                    <button id="do-add-bot-btn" 
-                        style="width: 100%; padding: 8px; background: #0088cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;"
-                        ${loading ? 'disabled' : ''}>
-                        ${loading ? 'Verifying...' : 'Add Bot'}
-                    </button>
+                    ${UI.Button({
+                        id: 'do-add-bot-btn',
+                        label: loading ? 'Verifying...' : 'Add Bot',
+                        variant: 'primary',
+                        style: 'width: 100%'
+                    })}
                 </div>
             </div>
         `;
@@ -192,7 +163,9 @@ export class BotsTab {
             if (e.key === 'Enter') this.handleAdd();
         });
 
-        col.querySelector('#do-add-bot-btn').addEventListener('click', () => this.handleAdd());
+        col.querySelector('#do-add-bot-btn').addEventListener('click', () => {
+            if (!loading) this.handleAdd();
+        });
     }
 
     async handleAdd() {
@@ -237,70 +210,86 @@ export class BotsTab {
         const activeBot = this.bots.find(b => b.token === this.activeBotToken);
         if (!activeBot) return;
 
-        const { method, params, response, consoleLoading, consoleError } = this.state;
+        const { method, response, consoleLoading, consoleError, paramValues } = this.state;
         const name = activeBot.info.first_name || 'Unknown Bot';
+        const methodDef = TelegramMethods[method];
 
         col.innerHTML = `
-            <div class="column-header">
-                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                    <span>${name}</span>
-                    <button id="delete-bot-btn" style="padding: 4px 8px; font-size: 11px; cursor: pointer; background: transparent; border: 1px solid #d32f2f; color: #d32f2f; border-radius: 3px;">Delete</button>
-                </div>
-            </div>
-            <div class="column-content" style="padding: 0; display: flex; flex-direction: column; height: 100%;">
+            ${UI.Header({
+                title: name,
+                actions: UI.Button({ id: 'delete-bot-btn', label: 'Delete', variant: 'danger', size: 'small', style: 'margin:0' })
+            })}
+            <div class="ui-content" style="display: flex; flex-direction: column;">
                 
-                <div style="padding: 15px; border-bottom: 1px solid #eee;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em;">Method</label>
-                    <input type="text" id="tg-method-input" list="tg-methods-list" value="${method}" 
-                        style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; box-sizing: border-box;">
-                    <datalist id="tg-methods-list">
-                        ${this.commonMethods.map(m => `<option value="${m}">`).join('')}
-                    </datalist>
+                <div style="padding: 15px; border-bottom: 1px solid #e1e4e8; background: #f6f8fa;">
+                    ${UI.FormGroup({
+                        label: 'Method',
+                        control: `
+                            <input type="text" id="tg-method-input" list="tg-methods-list" value="${method}" 
+                                class="ui-input" style="font-family: monospace;">
+                            <datalist id="tg-methods-list">
+                                ${this.commonMethods.map(m => `<option value="${m}">`).join('')}
+                            </datalist>
+                        `
+                    })}
+                    ${methodDef ? `<div style="margin-top: 5px; font-size: 0.8em; color: #586069;">${methodDef.description || ''}</div>` : ''}
                 </div>
 
-                <div style="padding: 15px; flex: 1; display: flex; flex-direction: column; min-height: 0;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em;">Parameters (JSON)</label>
-                    <textarea id="tg-params-input" 
-                        style="width: 100%; flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; resize: none; box-sizing: border-box;"
-                    >${params}</textarea>
+                <div style="padding: 15px; flex: 1; overflow-y: auto; min-height: 0;">
+                    ${this.renderParamsForm(methodDef, paramValues)}
                     
-                    <button id="tg-exec-btn" style="
-                        margin-top: 10px;
-                        background: #0088cc; color: white; border: none; padding: 10px; 
-                        border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%;
-                    " ${consoleLoading ? 'disabled' : ''}>
-                        ${consoleLoading ? 'Executing...' : 'Execute'}
-                    </button>
+                    <div style="margin-top: 20px;">
+                        ${UI.Button({
+                            id: 'tg-exec-btn',
+                            label: consoleLoading ? 'Executing...' : 'Execute Request',
+                            variant: 'primary',
+                            style: 'width: 100%'
+                        })}
+                    </div>
                     
-                    ${consoleError ? `<div style="margin-top: 10px; color: #c62828; font-size: 0.9em;">${consoleError}</div>` : ''}
+                    ${consoleError ? UI.Error({ message: consoleError }) : ''}
                 </div>
 
-                <div style="flex: 1; display: flex; flex-direction: column; border-top: 1px solid #eee; background: #f9f9f9; min-height: 200px;">
-                    <div style="padding: 10px; font-weight: bold; font-size: 0.9em; border-bottom: 1px solid #eee;">Response</div>
-                    <div style="
-                        flex: 1; padding: 10px; 
-                        font-family: monospace; white-space: pre-wrap; 
-                        overflow: auto; font-size: 0.85em;
-                        background: #2b2b2b; color: #f8f8f2;
-                    ">${response ? this.syntaxHighlight(response) : '<span style="color: #888;">// Response will appear here</span>'}</div>
+                <div style="flex: 1; display: flex; flex-direction: column; border-top: 1px solid #e1e4e8; background: #fff; min-height: 200px;">
+                    <div style="padding: 10px 15px; font-weight: 600; font-size: 0.9em; border-bottom: 1px solid #e1e4e8; background: #f6f8fa; color: #24292e; display: flex; justify-content: space-between;">
+                        <span>Response</span>
+                        ${response ? `<span style="font-weight: normal; font-size: 0.9em; color: ${response.ok ? '#28a745' : '#d73a49'};">${response.ok ? 'Success' : 'Error'}</span>` : ''}
+                    </div>
+                    ${UI.CodeBlock({
+                        id: 'response-view',
+                        content: response ? this.syntaxHighlight(response) : '<span style="color: #6a737d; font-style: italic;">Response will appear here...</span>',
+                        style: 'flex: 1; border: none; border-radius: 0; margin: 0;'
+                    })}
                 </div>
             </div>
         `;
 
         const methodInput = col.querySelector('#tg-method-input');
-        const paramsInput = col.querySelector('#tg-params-input');
         const execBtn = col.querySelector('#tg-exec-btn');
         const deleteBtn = col.querySelector('#delete-bot-btn');
         
         methodInput.addEventListener('change', (e) => {
             this.state.method = e.target.value;
+            this.state.paramValues = {}; // Reset params on method change
+            this.renderUI();
         });
         
-        paramsInput.addEventListener('input', (e) => {
-            this.state.params = e.target.value;
-        });
+        // Attach listeners to form inputs
+        if (methodDef) {
+            methodDef.params.forEach(param => {
+                const input = col.querySelector(`#param-${param.name}`);
+                if (input) {
+                    input.addEventListener('input', (e) => {
+                        const val = input.type === 'checkbox' ? input.checked : input.value;
+                        this.state.paramValues[param.name] = val;
+                    });
+                }
+            });
+        }
         
-        execBtn.addEventListener('click', () => this.executeRequest());
+        execBtn.addEventListener('click', () => {
+             if (!consoleLoading) this.executeRequest();
+        });
 
         deleteBtn.addEventListener('click', () => {
              if (confirm(`Are you sure you want to remove ${name}?`)) {
@@ -309,21 +298,96 @@ export class BotsTab {
         });
     }
 
+    renderParamsForm(methodDef, values) {
+        if (!methodDef) {
+            return `<div style="color: #6a737d; font-style: italic;">Select a supported method to view parameters.</div>`;
+        }
+
+        if (methodDef.params.length === 0) {
+            return `<div style="color: #6a737d; font-style: italic;">No parameters required.</div>`;
+        }
+
+        const sortedParams = [...methodDef.params].sort((a, b) => {
+            if (a.required === b.required) return 0;
+            return a.required ? -1 : 1;
+        });
+
+        return sortedParams.map(param => {
+            const isRequired = param.required;
+            const value = values[param.name] !== undefined ? values[param.name] : '';
+            
+            let control = '';
+            if (param.type === 'boolean') {
+                control = UI.Checkbox({ 
+                    id: `param-${param.name}`, 
+                    checked: !!value, 
+                    label: param.description || '' 
+                });
+            } else if (param.type === 'select') {
+                control = UI.Select({
+                    id: `param-${param.name}`,
+                    options: [{ value: '', label: '-- Select --' }, ...param.options.map(opt => ({ value: opt, label: opt }))],
+                    selected: value
+                });
+            } else if (param.type === 'textarea' || param.type === 'json') {
+                control = UI.Textarea({
+                    id: `param-${param.name}`,
+                    value: value,
+                    placeholder: param.type === 'json' ? '{ ... }' : ''
+                });
+            } else {
+                control = UI.Input({
+                    id: `param-${param.name}`,
+                    value: value,
+                    type: param.type === 'number' ? 'number' : 'text'
+                });
+            }
+
+            const label = `
+                ${param.name}
+                ${isRequired ? '<span style="color: #d73a49; margin-left: 4px;" title="Required">*</span>' : '<span style="color: #6a737d; font-weight: normal; font-size: 0.9em; margin-left: 4px;">(optional)</span>'}
+            `;
+
+            return `
+                <div style="margin-bottom: 15px;">
+                    ${param.type === 'boolean' ? control : UI.FormGroup({ label, control })}
+                    ${param.type !== 'boolean' && param.description ? `<div style="margin-top: 4px; font-size: 0.75em; color: #586069;">${param.description}</div>` : ''}
+                </div>
+            `;
+        }).join('');
+    }
+
     async executeRequest() {
         if (!this.activeBotToken) return;
 
         const method = this.state.method.trim();
+        const methodDef = TelegramMethods[method];
         let params = {};
-        
-        try {
-            const paramsStr = this.state.params.trim();
-            if (paramsStr) {
-                params = JSON.parse(paramsStr);
+
+        if (methodDef) {
+            // Build params from form values
+            for (const param of methodDef.params) {
+                const val = this.state.paramValues[param.name];
+                if (val !== undefined && val !== '') {
+                    if (param.type === 'json') {
+                        try {
+                            params[param.name] = typeof val === 'string' ? JSON.parse(val) : val;
+                        } catch (e) {
+                            this.state.consoleError = `Invalid JSON for parameter "${param.name}"`;
+                            this.renderUI();
+                            return;
+                        }
+                    } else if (param.type === 'number') {
+                        params[param.name] = Number(val);
+                    } else {
+                        params[param.name] = val;
+                    }
+                } else if (param.required) {
+                     this.state.consoleError = `Parameter "${param.name}" is required`;
+                     this.renderUI();
+                     return;
+                }
             }
-        } catch (e) {
-            this.state.consoleError = 'Invalid JSON in parameters';
-            this.renderUI();
-            return;
         }
 
         this.state.consoleLoading = true;
@@ -362,19 +426,19 @@ export class BotsTab {
             if (/^"/.test(match)) {
                 if (/:$/.test(match)) {
                     cls = 'key';
-                    return '<span style="color: #ff79c6;">' + match.replace(/:$/, '') + '</span>:';
+                    return '<span style="color: #d32f2f;">' + match.replace(/:$/, '') + '</span>:';
                 } else {
                     cls = 'string';
-                    return '<span style="color: #f1fa8c;">' + match + '</span>';
+                    return '<span style="color: #2e7d32;">' + match + '</span>';
                 }
             } else if (/true|false/.test(match)) {
                 cls = 'boolean';
-                return '<span style="color: #bd93f9;">' + match + '</span>';
+                return '<span style="color: #7b1fa2;">' + match + '</span>';
             } else if (/null/.test(match)) {
                 cls = 'null';
-                return '<span style="color: #6272a4;">' + match + '</span>';
+                return '<span style="color: #757575;">' + match + '</span>';
             }
-            return '<span style="color: #bd93f9;">' + match + '</span>';
+            return '<span style="color: #1565c0;">' + match + '</span>';
         });
     }
 }

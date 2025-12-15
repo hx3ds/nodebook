@@ -1,6 +1,8 @@
 import { PanelManager } from './PanelManager.js';
 import { CloudflarePlugin } from './plugins/cloudflare/CloudflarePlugin.js';
 import { TelegramPlugin } from './plugins/telegram/TelegramPlugin.js';
+import { HttpClientPlugin } from './plugins/http_client/HttpClientPlugin.js';
+import { YtDlpPlugin } from './plugins/yt_dlp/YtDlpPlugin.js';
 
 const manager = new PanelManager('panel-layer');
 
@@ -28,6 +30,8 @@ export const panel = {
         // Register Plugins
         manager.registerPlugin(new CloudflarePlugin());
         manager.registerPlugin(new TelegramPlugin());
+        manager.registerPlugin(new HttpClientPlugin());
+        manager.registerPlugin(new YtDlpPlugin());
         
         // If we want to expose the manager globally for debugging
         window.panelManager = manager;

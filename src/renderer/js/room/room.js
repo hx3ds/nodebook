@@ -5,6 +5,7 @@ export const room = {
     last_event: null,
     inEvent: false,
     isDirty: false,
+    onStateChanged: null,
     visible: true,
 
     element: null,
@@ -25,7 +26,6 @@ export const room = {
     connectingFrom: null,
     connectingTo: null,
 
-    dragOffset: { x: 0, y: 0 },
     lastMousePos: { x: 0, y: 0 },
     currentMousePos: { x: 0, y: 0 },
 
@@ -741,7 +741,9 @@ export const room = {
             room.resetSelection();
         }
         room.selectedBox = box;
-        room.selectedBoxes.push(box);
+        if (!room.selectedBoxes.includes(box)) {
+            room.selectedBoxes.push(box);
+        }
         room.highlightBox(box, true);
     },
 
@@ -962,6 +964,16 @@ export const room = {
             } else if (box.type === 'html' && box.text) {
                 textDiv.innerHTML = box.text;
                 textDiv.classList.add('html-content');
+                // Restore video time if present
+                textDiv.querySelectorAll('video').forEach(video => {
+                    const time = parseFloat(video.getAttribute('data-start-time'));
+                    if (!isNaN(time) && isFinite(time)) {
+                        video.currentTime = time;
+                    }
+                    // Auto-save on video interaction
+                    video.onpause = () => room.saveState();
+                    video.onseeked = () => room.saveState();
+                });
             } else {
                 textDiv.textContent = box.text || '';
             }
@@ -1111,6 +1123,16 @@ export const room = {
                      if (textDiv.innerHTML !== box.text) {
                         textDiv.innerHTML = box.text;
                         textDiv.classList.add('html-content');
+                        // Restore video time if present
+                        textDiv.querySelectorAll('video').forEach(video => {
+                            const time = parseFloat(video.getAttribute('data-start-time'));
+                            if (!isNaN(time) && isFinite(time)) {
+                                video.currentTime = time;
+                            }
+                            // Auto-save on video interaction
+                            video.onpause = () => room.saveState();
+                            video.onseeked = () => room.saveState();
+                        });
                      }
                 } else {
                     // Plain text
@@ -1615,7 +1637,6 @@ export const room = {
         // Get the scroll dimensions
         const scrollWidth = textDiv.scrollWidth;
         const scrollHeight = textDiv.scrollHeight;
-        console.log('scrollWidth:', scrollWidth, 'scrollHeight:', scrollHeight);
         
         const newWidth = scrollWidth + horizontalPadding;
         const newHeight = scrollHeight + verticalPadding;
@@ -2004,6 +2025,27 @@ export const room = {
     },
 
     serializeState() {
+        // Capture video current time for HTML boxes
+        room.boxes.forEach(box => {
+            if (box.type === 'html' && box.element) {
+                const textDiv = box.element.querySelector('.box-text');
+                if (textDiv) {
+                    const videos = textDiv.querySelectorAll('video');
+                    let changed = false;
+                    videos.forEach(video => {
+                        if (video.currentTime > 0 || video.hasAttribute('data-start-time')) {
+                            video.setAttribute('data-start-time', video.currentTime);
+                            changed = true;
+                        }
+                    });
+                    
+                    if (changed) {
+                        box.text = textDiv.innerHTML;
+                    }
+                }
+            }
+        });
+
         const allArrows = [];
         
         // Collect all arrows from all boxes
@@ -2105,6 +2147,9 @@ export const room = {
         this.isDirty = true;
         const state = room.serializeState();
         localStorage.setItem('nodeState', JSON.stringify(state));
+        if (this.onStateChanged) {
+            this.onStateChanged();
+        }
     },
 
     loadState(state) {
@@ -2151,7 +2196,7 @@ export const room = {
             room.historyIndex--;
             const state = room.history[room.historyIndex];
             room.loadState(state);
-            room.isDirty = true;
+            room.saveState();
             return true;
         }
         return false;
@@ -2162,7 +2207,7 @@ export const room = {
             room.historyIndex++;
             const state = room.history[room.historyIndex];
             room.loadState(state);
-            room.isDirty = true;
+            room.saveState();
             return true;
         }
         return false;

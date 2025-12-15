@@ -1,13 +1,14 @@
 /* Sidebar */
 :root {
-    --sidebar-bg: #f3f3f3;
-    --sidebar-text: #333333;
-    --sidebar-border: #d1d1d1;
-    --sidebar-hover: #e4e6f1; /* VS Code light theme hover */
-    --sidebar-active: #0060c0; /* VS Code selection blue */
-    --sidebar-accent: #007aff;
+    --sidebar-bg: #fcfcfc;
+    --sidebar-text: #24292e;
+    --sidebar-subtext: #586069;
+    --sidebar-border: #e1e4e8;
+    --sidebar-hover: #f6f8fa;
+    --sidebar-active: #0366d6;
     --sidebar-selected-text: #ffffff;
-    --sidebar-guide: #e0e0e0;
+    --sidebar-header-bg: #f6f8fa;
+    --sidebar-guide: #e1e4e8;
 }
 
 #sidebar {
@@ -25,6 +26,7 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     font-size: 13px;
     user-select: none;
+    transition: margin-left 0.2s ease;
 }
 
 #sidebar.collapsed {
@@ -32,61 +34,63 @@
 }
 
 #sidebarHeader {
-    padding: 0 12px;
-    height: 35px;
+    padding: 0 16px;
+    height: 48px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: transparent;
+    background: var(--sidebar-header-bg);
+    border-bottom: 1px solid var(--sidebar-border);
+    box-sizing: border-box;
 }
 
 #sidebarTitle {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 600;
-    color: #616161;
-    text-transform: uppercase;
+    color: var(--sidebar-text);
+    text-transform: none;
 }
 
 #sidebarActions {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
 }
 
 #sidebarActions button {
     background: none;
     border: none;
-    color: #666;
+    color: var(--sidebar-subtext);
     cursor: pointer;
     padding: 4px;
     border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.2s;
 }
 
 #sidebarActions button:hover {
-    background: rgba(0, 0, 0, 0.1);
-    color: #333;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--sidebar-active);
 }
 
 #fileTree {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 0;
+    padding: 8px 0;
 }
 
 /* Scrollbar styling */
 #fileTree::-webkit-scrollbar {
-    width: 10px;
+    width: 8px;
     background: transparent;
 }
 
 #fileTree::-webkit-scrollbar-thumb {
     background: transparent;
-    border-radius: 5px;
-    border: 2px solid var(--sidebar-bg); /* Padding trick */
+    border-radius: 4px;
 }
 
 #fileTree:hover::-webkit-scrollbar-thumb {
@@ -104,10 +108,11 @@
     align-items: center;
     cursor: pointer;
     color: var(--sidebar-text);
-    height: 22px; /* VS Code compact height */
+    height: 28px;
     position: relative;
     box-sizing: border-box;
     padding-right: 10px;
+    transition: background-color 0.15s ease;
 }
 
 /* Ensure children don't interfere with drag events */
@@ -135,25 +140,19 @@
     width: 16px;
     height: 16px;
     flex-shrink: 0;
-    color: #dcb67a; /* Default folder color */
+    color: #90a4ae;
 }
 
 /* Specific icon colors */
 .tree-item-header.active-file .tree-item-icon,
 .tree-item-header.selected .tree-item-icon {
-    color: #fff; /* White icon on selection */
+    color: rgba(255, 255, 255, 0.9);
 }
 
 /* File icon color when not selected */
 .tree-item-header[data-type="file"] .tree-item-icon {
-    color: #90a4ae; /* VS Code file gray/blue */
+    color: #6a737d;
 }
-
-/* JSON file color */
-.tree-item-header[data-type="file"] .tree-item-icon svg path[fill="#fff"] {
-    fill: currentColor; /* Make the 'J' or internal detail inherit if needed, or keep white */
-}
-/* Actually JSON icon usually has yellow, but let's stick to simple gray or specific if we had classes */
 
 /* Expand Arrow */
 .tree-item-expand {
@@ -161,15 +160,16 @@
     align-items: center;
     justify-content: center;
     width: 20px;
-    height: 22px;
+    height: 28px;
     flex-shrink: 0;
-    color: #8b949e; /* VS Code gray */
+    color: #959da5;
     margin-right: 0px;
+    transition: transform 0.15s;
 }
 
 .tree-item-header.selected .tree-item-expand,
 .tree-item-header.active-file .tree-item-expand {
-    color: #fff;
+    color: rgba(255, 255, 255, 0.8);
 }
 
 .tree-item-expand.no-children {
@@ -182,46 +182,34 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    line-height: 22px;
+    line-height: 28px;
+    font-size: 13px;
 }
 
 /* Children Container */
 .tree-item-children {
-    /* No margin/padding here because we handle indentation in the header padding */
     display: block;
 }
 
 /* Drag and Drop */
 .tree-item-header.drag-over {
-    background: rgba(0, 122, 255, 0.2);
-    outline: 1px solid var(--sidebar-accent);
+    background: rgba(3, 102, 214, 0.1);
+    outline: 1px solid var(--sidebar-active);
     z-index: 10;
 }
 
 #fileTree.drag-over-container {
-    background: rgba(0, 122, 255, 0.05);
-    box-shadow: inset 0 0 0 2px var(--sidebar-accent);
+    background: rgba(3, 102, 214, 0.05);
+    box-shadow: inset 0 0 0 2px var(--sidebar-active);
 }
 
-/* Footer & Resizer remain same */
+/* Footer */
 #sidebarFooter {
-    padding: 0 12px;
-    height: 22px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: var(--sidebar-active); /* VS Code footer is often colored */
-    color: #fff;
-    font-size: 11px;
-}
-
-/* Just keep footer simple matching sidebar bg for now to be safe */
-#sidebarFooter {
-    padding: 0 12px;
-    height: 22px;
-    background: transparent;
+    padding: 0 16px;
+    height: 32px;
+    background: var(--sidebar-bg);
     border-top: 1px solid var(--sidebar-border);
-    color: #666;
+    color: var(--sidebar-subtext);
     position: relative;
     display: flex;
     align-items: center;
@@ -229,18 +217,17 @@
 }
 
 #sidebarResizeHandle {
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
     cursor: ew-resize;
     position: absolute;
-    bottom: 2px;
-    right: 2px;
-    background-image: linear-gradient(135deg, transparent 50%, #999 50%);
-    opacity: 0.5;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(135deg, transparent 50%, #d1d5da 50%);
 }
 
 #sidebarResizeHandle:hover {
-    opacity: 1;
+    background: linear-gradient(135deg, transparent 50%, #0366d6 50%);
 }
 
 #currentFolderPath {
@@ -250,6 +237,7 @@
     flex: 1;
     margin-right: 5px;
     font-size: 11px;
+    color: var(--sidebar-subtext);
 }
 
 /* Context Menu */
@@ -257,27 +245,28 @@
     position: fixed;
     display: none;
     background: #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
     padding: 4px 0;
     z-index: 1000;
-    min-width: 160px;
+    min-width: 180px;
 }
 
 #fileContextMenu button {
     display: block;
     width: 100%;
     text-align: left;
-    padding: 6px 16px;
+    padding: 8px 16px;
     background: none;
     border: none;
     cursor: pointer;
     font-size: 13px;
-    color: #333;
+    color: #24292e;
+    transition: background-color 0.1s;
 }
 
 #fileContextMenu button:hover {
-    background: var(--sidebar-accent);
+    background: var(--sidebar-active);
     color: #fff;
 }

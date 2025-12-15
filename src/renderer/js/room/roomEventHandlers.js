@@ -68,10 +68,7 @@ export const roomEventHandlers = {
                 if (room.triggeringMovement) {
                     if (['box', 'box-text-container', 'box-arrow-container'].includes(elementType)) {
                         registerEvent('movingBox');
-                        room.dragOffset = {
-                            x: pos.x - owner.x,
-                            y: pos.y - owner.y
-                        };
+                        room.lastMousePos = pos;
                     } else if (elementType === 'room') {
                         registerEvent('panning');
                         room.lastPanPos = { x: e.clientX, y: e.clientY };
@@ -136,10 +133,7 @@ export const roomEventHandlers = {
                         e.preventDefault();
                         e.stopPropagation();
                         room.selectBox(owner, ifAppend);
-                        room.dragOffset = {
-                            x: pos.x - owner.x,
-                            y: pos.y - owner.y
-                        };
+                        room.lastMousePos = pos;
                         break;
                     case 'room':
                         registerEvent('panning')
@@ -246,20 +240,26 @@ export const roomEventHandlers = {
                     room.updateSelectionPreview();
                 }
                 break;
-            case 'movingBox':
+            case 'movingBox': {
                 e.preventDefault();
                 e.stopPropagation();
                 const boxesToMove = room.selectedBoxes.length > 0 ? room.selectedBoxes :
                     (room.selectedBox ? [room.selectedBox] : []);
+                
+                const dx = pos.x - room.lastMousePos.x;
+                const dy = pos.y - room.lastMousePos.y;
+
                 boxesToMove.forEach(box => {
-                    box.x = pos.x - room.dragOffset.x;
-                    box.y = pos.y - room.dragOffset.y;
+                    box.x += dx;
+                    box.y += dy;
                     room.drawBox(box, false);
                 });
+                room.lastMousePos = pos;
                 // Update arrows connected to moving boxes in real-time
                 room.drawArrows();
                 break;
-            case 'panning':
+            }
+            case 'panning': {
                 const dx = e.clientX - room.lastPanPos.x;
                 const dy = e.clientY - room.lastPanPos.y;
                 room.offset.x += dx;
@@ -270,6 +270,7 @@ export const roomEventHandlers = {
                 room.drawAll(false);
                 room.updateSelectionPreview();
                 break;
+            }
         }
     },
 
@@ -340,7 +341,7 @@ export const roomEventHandlers = {
                 room.pushHistory();
                 room.saveState();
                 room.drawArrows(); // Redraw arrows to update connections
-                room.dragOffset = { x: 0, y: 0 };
+                room.lastMousePos = null;
                 break;
             case 'panning':
                 room.element.style.cursor = 'default';
@@ -559,7 +560,6 @@ function registerEvent(event) {
     room.last_event = room.event;
     room.event = event;
     room.inEvent = true;
-    console.log('last event:', room.last_event, '-> current event:', room.event);
     wrapEvent();
 }
 
@@ -608,7 +608,7 @@ function wrapEvent() {
             if (room.event !== 'movingBox') {
                 room.pushHistory();
                 room.saveState();
-                room.dragOffset = { x: 0, y: 0 };
+                room.lastMousePos = null;
                 room.drawArrows(); // Update arrow positions
             }
             break;

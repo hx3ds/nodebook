@@ -103,8 +103,8 @@
 }
 
 .box-text {
-    min-height: 59px;
-    min-width: 142px;
+    min-height: 100%;
+    min-width: 100%;
     font-size: 15px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     color: #3c4043;
@@ -116,8 +116,8 @@
     -ms-user-select: none;
     cursor: text;
     pointer-events: auto;
-    width: 100%;
-    height: 100%;
+    width: fit-content;
+    height: fit-content;
     box-sizing: border-box;
 }
 
@@ -356,8 +356,7 @@
 
 /* HTML Content Styles */
 .box-text.html-content {
-    width: 100%;
-    max-width: 100%;
+
     white-space: normal;
 }
 
@@ -367,6 +366,7 @@
     max-height: 100%;
     display: block;
     object-fit: contain;
+    vertical-align: bottom; /* Removes the bottom space reserved for descenders */
 }
 
 /* HTML Edit Mode */

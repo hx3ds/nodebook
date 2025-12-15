@@ -95,11 +95,11 @@ export const explorer = {
             }
         }
 
-        setInterval(() => {
-                if (explorer.currentFilePath && room.isDirty) {
-                    explorer.saveCurrentFile();
-                }
-            }, 5000);
+        room.onStateChanged = () => {
+            if (explorer.currentFilePath) {
+                explorer.saveCurrentFile();
+            }
+        };
     },
     
     setupSidebarResizer() {
@@ -679,11 +679,9 @@ export const explorer = {
             // Compare case-insensitively for Windows? 
             // Let's stick to exact match first, but usually casing matches if from same app.
             if (sourceParent.toLowerCase() === rootPath.toLowerCase()) {
-                console.log('File already in root');
                 return;
             }
 
-            console.log(`Moving ${sourceItem.name} to root`);
             await this.moveFile(sourceItem, this.rootPath);
         } catch (error) {
             console.error('Container drop error:', error);

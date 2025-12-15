@@ -1,186 +1,153 @@
+import { cfFetch } from '../utils.js';
+import { UI } from '../../../ui/index.js';
+
 export class TunnelTab {
-    constructor(apiToken, apiEmail) {
-        this.apiToken = apiToken;
-        this.apiEmail = apiEmail;
-        this.apiUrl = 'https://api.cloudflare.com/client/v4';
+    constructor(creds) {
+        this.token = creds.token;
+        this.email = creds.email;
         
         this.state = {
             loading: false,
-            error: null,
             accounts: [],
             selectedAccount: null,
             tunnels: [],
             selectedTunnel: null,
             connections: [],
-            config: null, // Stores the full config object
+            config: null,
+            isCreating: false,
             isEditingConfig: false,
-            isCreating: false
+            error: null
         };
     }
 
-    updateCredentials(token, email) {
-        this.apiToken = token;
-        this.apiEmail = email;
-        this.state = { ...this.state, accounts: [], tunnels: [], selectedTunnel: null, error: null, isCreating: false };
-        if (this.container) this.renderUI();
-        if (token) this.fetchAccounts();
+    updateCredentials({ token, email }) {
+        this.token = token;
+        this.email = email;
+        this.state = {
+            loading: false,
+            accounts: [],
+            selectedAccount: null,
+            tunnels: [],
+            selectedTunnel: null,
+            connections: [],
+            config: null,
+            isCreating: false,
+            isEditingConfig: false,
+            error: null
+        };
+        if (this.container) {
+            this.fetchAccounts();
+        }
     }
 
     render(container) {
-        this.container = container; 
-        if (this.apiToken && this.state.accounts.length === 0) {
+        this.container = container;
+        this.renderUI();
+        if (this.state.accounts.length === 0 && !this.state.loading) {
             this.fetchAccounts();
         }
-        this.renderUI();
     }
 
     renderUI() {
         if (!this.container) return;
-        this.container.innerHTML = ''; 
-
-        const listColumn = this.container;
-        this.renderListColumn(listColumn);
-
-        // Manage dynamic columns
-        // 1. Detail Column (if tunnel selected)
-        // 2. Edit Config Column (if editing)
-        // 3. Create Tunnel Column (if creating)
         
-        // Cleanup existing next columns
-        let next = listColumn.nextElementSibling;
-        while(next) {
-            const toRemove = next;
-            next = next.nextElementSibling;
-            toRemove.remove();
-        }
+        this.container.innerHTML = '';
+        this.renderAccountColumn(this.container);
 
-        if (this.state.isCreating) {
-            const createColumn = this.createColumn(listColumn.parentElement);
-            this.renderCreateColumn(createColumn);
-        } else if (this.state.selectedTunnel) {
-            const detailColumn = this.createColumn(listColumn.parentElement);
-            this.renderDetailColumn(detailColumn);
+        UI.Layout.clearSiblings(this.container);
+        const parent = this.container.parentElement;
+        if (!parent) return;
 
-            if (this.state.isEditingConfig) {
-                const editColumn = this.createColumn(listColumn.parentElement);
-                this.renderEditConfigColumn(editColumn);
+        if (this.state.selectedAccount) {
+            const tunnelCol = UI.Layout.createColumn(parent);
+            this.renderTunnelListColumn(tunnelCol);
+
+            if (this.state.isCreating) {
+                const createCol = UI.Layout.createColumn(parent);
+                this.renderCreateColumn(createCol);
+            } else if (this.state.selectedTunnel) {
+                const detailCol = UI.Layout.createColumn(parent);
+                this.renderDetailColumn(detailCol);
+
+                if (this.state.isEditingConfig) {
+                    const editCol = UI.Layout.createColumn(parent);
+                    this.renderEditConfigColumn(editCol);
+                }
             }
         }
-        
-        this.updateColumnVisibility();
+        UI.Layout.updateVisibility(parent);
     }
 
-    updateColumnVisibility() {
-        if (!this.container || !this.container.parentElement) return;
-        
-        const container = this.container.parentElement;
-        if (!container.children) return;
-
-        const columns = Array.from(container.children).filter(c => c.classList.contains('finder-column'));
-        
-        // Reset all to visible first
-        columns.forEach(c => c.style.display = '');
-
-        if (columns.length > 2) {
-            // Hide the first one (List)
-            columns[0].style.display = 'none';
-        }
-    }
-
-    createColumn(parent) {
-        const col = document.createElement('div');
-        col.className = 'finder-column animate-in';
-        parent.appendChild(col);
-        return col;
-    }
-
-    renderListColumn(col) {
-        const { loading, error, accounts, selectedAccount, tunnels, selectedTunnel } = this.state;
+    renderAccountColumn(col) {
+        const { accounts = [], selectedAccount, loading, error } = this.state;
         
         col.innerHTML = `
-            <div class="column-header">
-                <span>Tunnels</span>
-                ${loading ? '<span style="font-size:0.8em; color:#888;">Loading...</span>' : ''}
-            </div>
-            <div class="column-content">
-                ${error ? `<div style="padding: 10px; color: #c62828;">${error}</div>` : ''}
-                
-                <div style="padding: 10px; border-bottom: 1px solid #eee;">
-                    <select id="account-select" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px;">
-                        <option value="">Select Account</option>
-                        ${accounts.map(acc => `
-                            <option value="${acc.id}" ${selectedAccount === acc.id ? 'selected' : ''}>${acc.name}</option>
-                        `).join('')}
-                    </select>
-                </div>
-
-                ${selectedAccount ? `
-                    <div class="tunnel-list">
-                        ${tunnels.map(t => `
-                            <div class="list-item ${selectedTunnel && selectedTunnel.id === t.id ? 'active' : ''}" data-id="${t.id}">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span style="font-weight: 500;">${t.name}</span>
-                                    <div style="width: 8px; height: 8px; border-radius: 50%; background: ${t.status === 'healthy' ? '#4caf50' : '#f44336'};"></div>
-                                </div>
-                                <div style="font-size: 0.8em; opacity: 0.7; margin-top: 2px;">${t.id.substring(0, 8)}...</div>
-                            </div>
-                        `).join('')}
-                        ${tunnels.length === 0 && !loading ? '<div style="padding: 15px; color: #888; font-style: italic;">No tunnels found.</div>' : ''}
-                        
-                        <div style="padding: 10px;">
-                           <button id="create-tunnel-btn" style="width: 100%; padding: 6px; cursor: pointer;">+ Create Tunnel</button>
-                        </div>
-                    </div>
-                ` : '<div style="padding: 20px; color: #888; text-align: center;">Please select an account.</div>'}
+            ${UI.Header({ title: 'Accounts' })}
+            <div class="ui-content">
+                ${loading && !accounts.length ? UI.Loading({ message: 'Loading...' }) : ''}
+                ${error ? UI.Error({ message: error }) : ''}
+                ${(accounts || []).map(acc => UI.ListItem({
+                    id: acc.id,
+                    title: acc.name,
+                    selected: selectedAccount === acc.id
+                })).join('')}
             </div>
         `;
 
-        const select = col.querySelector('#account-select');
-        if (select) {
-            select.addEventListener('change', (e) => this.selectAccount(e.target.value));
-        }
+        col.querySelector('.ui-content').addEventListener('click', e => {
+            const item = e.target.closest('.ui-list-item');
+            if (item) this.selectAccount(item.dataset.id);
+        });
+    }
 
-        col.querySelectorAll('.list-item').forEach(el => {
-            el.addEventListener('click', () => this.selectTunnel(el.dataset.id));
+    renderTunnelListColumn(col) {
+        const { tunnels = [], selectedTunnel, loading } = this.state;
+        
+        col.innerHTML = `
+            ${UI.Header({ title: 'Tunnels' })}
+            <div class="ui-content">
+                ${loading ? UI.Loading({ message: 'Loading...' }) : ''}
+                ${(tunnels || []).length === 0 && !loading ? '<div class="ui-empty">No tunnels found.</div>' : ''}
+                ${(tunnels || []).map(t => UI.ListItem({
+                    id: t.id,
+                    title: t.name,
+                    subtitle: `ID: ${t.id.split('-')[0]}...`,
+                    badge: UI.Badge({ label: t.status, variant: t.status === 'healthy' ? 'success' : 'warning' }),
+                    selected: selectedTunnel && selectedTunnel.id === t.id
+                })).join('')}
+            </div>
+            <div style="padding: 10px; border-top: 1px solid #e1e4e8;">
+               ${UI.Button({ id: 'create-tunnel-btn', label: '+ Create Tunnel' })}
+            </div>
+        `;
+
+        col.querySelector('.ui-content').addEventListener('click', e => {
+            const item = e.target.closest('.ui-list-item');
+            if (item) this.selectTunnel(item.dataset.id);
         });
         
-        const createBtn = col.querySelector('#create-tunnel-btn');
-        if (createBtn) {
-            createBtn.addEventListener('click', () => {
-                this.state.isCreating = true;
-                this.state.selectedTunnel = null;
-                this.renderUI();
-            });
-        }
+        col.querySelector('#create-tunnel-btn')?.addEventListener('click', () => {
+            this.state.isCreating = true;
+            this.state.selectedTunnel = null;
+            this.renderUI();
+        });
     }
 
     renderCreateColumn(col) {
         const { loading } = this.state;
         
         col.innerHTML = `
-            <div class="column-header">
-                <span>Create Tunnel</span>
-                <button id="close-create-btn" style="padding: 4px 8px; font-size: 11px; cursor: pointer; background: transparent; border: 1px solid #ddd; border-radius: 3px;">✕</button>
-            </div>
-            <div class="column-content" style="padding: 20px;">
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; font-size: 0.85em; margin-bottom: 5px; color: #666;">Tunnel Name</label>
-                    <input type="text" id="new-tunnel-name" placeholder="e.g. my-home-server" 
-                        style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
-                    <div style="margin-top: 5px; font-size: 0.75em; color: #888;">
-                        A secure tunnel to your origin server.
-                    </div>
-                </div>
+            ${UI.Header({ title: 'Create Tunnel', actions: UI.CloseButton({ id: 'close-create-btn' }) })}
+            <div class="ui-content padded">
+                ${UI.FormGroup({
+                    label: 'Tunnel Name',
+                    control: UI.Input({ id: 'new-tunnel-name', placeholder: 'e.g. my-home-server' }) + 
+                             '<div class="ui-text-small ui-mt-2">A secure tunnel to your origin server.</div>'
+                })}
 
-                <div style="margin-top: 20px;">
-                    <button id="do-create-tunnel-btn" 
-                        style="width: 100%; padding: 8px; background: #007aff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">
-                        ${loading ? 'Creating...' : 'Create Tunnel'}
-                    </button>
-                    <button id="cancel-create-btn" 
-                        style="width: 100%; padding: 8px; margin-top: 10px; background: none; color: #666; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">
-                        Cancel
-                    </button>
+                <div class="ui-mt-2">
+                    ${UI.Button({ id: 'do-create-tunnel-btn', label: loading ? 'Creating...' : 'Create Tunnel', variant: 'primary' })}
+                    ${UI.Button({ id: 'cancel-create-btn', label: 'Cancel' })}
                 </div>
             </div>
         `;
@@ -206,24 +173,24 @@ export class TunnelTab {
     }
 
     renderDetailColumn(col) {
-        const { selectedTunnel, connections, config, loading } = this.state;
+        const { selectedTunnel, connections, config } = this.state;
         if (!selectedTunnel) return;
 
         col.innerHTML = `
-            <div class="column-header">
-                <span>${selectedTunnel.name}</span>
-                <div style="display: flex; gap: 5px; align-items: center;">
-                    <button id="edit-config-btn" style="padding: 4px 8px; font-size: 11px; cursor: pointer;">Config</button>
-                    <button id="delete-tunnel-btn" style="padding: 4px 8px; font-size: 11px; cursor: pointer; color: #c62828; border: 1px solid #ffcdd2; background: #ffebee;">Delete</button>
-                    <button id="close-detail-btn" style="padding: 4px 8px; font-size: 11px; cursor: pointer; background: transparent; border: 1px solid #ddd; border-radius: 3px; margin-left: 5px;">✕</button>
-                </div>
-            </div>
-            <div class="column-content" style="padding: 20px;">
-                <div style="margin-bottom: 20px;">
-                    <h2 style="margin: 0 0 10px 0; font-size: 1.2em;">Overview</h2>
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px 15px; font-size: 0.9em;">
+            ${UI.Header({
+                title: selectedTunnel.name,
+                actions: `
+                    ${UI.Button({ id: 'edit-config-btn', label: 'Config', size: 'small', style: 'width:auto;margin:0' })}
+                    ${UI.Button({ id: 'delete-tunnel-btn', label: 'Delete', size: 'small', variant: 'danger', style: 'width:auto;margin:0' })}
+                    ${UI.CloseButton({ id: 'close-detail-btn' })}
+                `
+            })}
+            <div class="ui-content padded">
+                <div class="ui-mb-2">
+                    <h2 class="ui-label" style="font-size:14px;margin-bottom:10px">Overview</h2>
+                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px 15px; font-size: 13px;">
                         <span style="color: #666;">Status:</span>
-                        <span style="font-weight: 500; color: ${selectedTunnel.status === 'healthy' ? '#2e7d32' : '#c62828'};">${selectedTunnel.status}</span>
+                        ${UI.Badge({ label: selectedTunnel.status, variant: selectedTunnel.status === 'healthy' ? 'success' : 'warning' })}
                         
                         <span style="color: #666;">ID:</span>
                         <span style="font-family: monospace;">${selectedTunnel.id}</span>
@@ -233,42 +200,41 @@ export class TunnelTab {
                     </div>
                 </div>
 
-                <!-- Config Visualization -->
-                <div style="margin-bottom: 20px;">
-                    <h3 style="margin: 0 0 10px 0; font-size: 1em;">Ingress Rules</h3>
-                    <div style="border: 1px solid #eee; border-radius: 6px; overflow: hidden; font-size: 0.85em;">
+                <div class="ui-mb-2">
+                    <h3 class="ui-label" style="font-size:13px;margin-bottom:10px">Ingress Rules</h3>
+                    <div style="border: 1px solid #e1e4e8; border-radius: 6px; overflow: hidden; font-size: 12px;">
                         ${config && config.config && config.config.ingress ? `
                             <table style="width: 100%; border-collapse: collapse;">
-                                <thead style="background: #f5f5f5;">
+                                <thead style="background: #f6f8fa;">
                                     <tr>
-                                        <th style="text-align: left; padding: 6px 10px; border-bottom: 1px solid #eee;">Hostname</th>
-                                        <th style="text-align: left; padding: 6px 10px; border-bottom: 1px solid #eee;">Service</th>
+                                        <th style="text-align: left; padding: 8px 12px; border-bottom: 1px solid #e1e4e8;">Hostname</th>
+                                        <th style="text-align: left; padding: 8px 12px; border-bottom: 1px solid #e1e4e8;">Service</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     ${config.config.ingress.map(rule => `
-                                        <tr style="border-bottom: 1px solid #f9f9f9;">
-                                            <td style="padding: 6px 10px; color: #333;">${rule.hostname || '<em style="color:#888">* (Catch-all)</em>'}</td>
-                                            <td style="padding: 6px 10px; font-family: monospace; color: #555;">${rule.service}</td>
+                                        <tr style="border-bottom: 1px solid #eaecef;">
+                                            <td style="padding: 8px 12px; color: #333;">${rule.hostname || '<em style="color:#888">*</em>'}</td>
+                                            <td style="padding: 8px 12px; font-family: monospace; color: #555;">${rule.service}</td>
                                         </tr>
                                     `).join('')}
                                 </tbody>
                             </table>
-                        ` : '<div style="padding: 10px; color: #888;">No configuration loaded or local managed.</div>'}
+                        ` : '<div class="ui-empty" style="padding:10px">No configuration loaded or local managed.</div>'}
                     </div>
                 </div>
 
-                <div style="margin-bottom: 10px; font-weight: 600; color: #444;">Active Connections</div>
-                <div style="background: #f9f9f9; border: 1px solid #eee; border-radius: 6px; overflow: hidden;">
+                <div class="ui-label" style="font-size:13px;margin-bottom:10px">Active Connections</div>
+                <div style="background: #fff; border: 1px solid #e1e4e8; border-radius: 6px; overflow: hidden;">
                     ${connections.length > 0 ? connections.map(c => `
-                        <div style="padding: 10px; border-bottom: 1px solid #eee; font-size: 0.85em;">
-                            <div style="display: flex; justify-content: space-between;">
+                        <div style="padding: 10px; border-bottom: 1px solid #eaecef; font-size: 12px;">
+                            <div class="ui-flex-between">
                                 <strong>${c.colo_name}</strong>
                                 <span style="color: #666;">${c.origin_ip}</span>
                             </div>
                             <div style="font-family: monospace; color: #888; margin-top: 2px;">${c.id}</div>
                         </div>
-                    `).join('') : '<div style="padding: 15px; color: #888; text-align: center;">No active connections</div>'}
+                    `).join('') : '<div class="ui-empty" style="padding:15px">No active connections</div>'}
                 </div>
             </div>
         `;
@@ -283,36 +249,35 @@ export class TunnelTab {
                 this.deleteTunnel(selectedTunnel.id);
             }
         });
+        
+        col.querySelector('#close-detail-btn').addEventListener('click', () => {
+            this.state.selectedTunnel = null;
+            this.state.isEditingConfig = false;
+            this.renderUI();
+        });
     }
 
     renderEditConfigColumn(col) {
-        const { config, loading } = this.state;
+        const { config } = this.state;
         
         col.innerHTML = `
-            <div class="column-header">
-                <span>Edit Configuration</span>
-                <div style="display: flex; gap: 5px; align-items: center;">
-                    <button id="save-config-btn" style="padding: 4px 8px; font-size: 11px; cursor: pointer; background: #007aff; color: white; border: none; border-radius: 3px;">Save</button>
-                    <button id="close-edit-btn" style="padding: 4px 8px; font-size: 11px; cursor: pointer; background: transparent; border: 1px solid #ddd; border-radius: 3px; margin-left: 5px;">✕</button>
-                </div>
-            </div>
-            <div class="column-content" style="padding: 0; display: flex; flex-direction: column; height: 100%;">
-                <div style="padding: 10px; background: #f5f5f5; border-bottom: 1px solid #ddd; font-size: 0.85em; color: #666;">
+            ${UI.Header({
+                title: 'Edit Configuration',
+                actions: `
+                    ${UI.Button({ id: 'save-config-btn', label: 'Save', variant: 'primary', size: 'small', style: 'width:auto;margin:0' })}
+                    ${UI.CloseButton({ id: 'close-edit-btn' })}
+                `
+            })}
+            <div class="ui-content" style="padding: 0; display: flex; flex-direction: column; height: 100%;">
+                <div style="padding: 10px; background: #f6f8fa; border-bottom: 1px solid #e1e4e8; font-size: 12px; color: #586069;">
                     Edit the JSON configuration directly.
                 </div>
-                <textarea id="config-editor" style="
-                    flex: 1; 
-                    width: 100%; 
-                    resize: none; 
-                    border: none; 
-                    padding: 10px; 
-                    font-family: monospace; 
-                    font-size: 12px; 
-                    line-height: 1.5;
-                    outline: none;
-                ">${config ? JSON.stringify(config, null, 2) : '{}'}</textarea>
+                ${UI.Textarea({ id: 'config-editor', value: config ? JSON.stringify(config, null, 2) : '{}' })}
             </div>
         `;
+        
+        const textarea = col.querySelector('#config-editor');
+        textarea.style.cssText = "flex: 1; border: none; border-radius: 0; padding: 10px; font-family: monospace;";
 
         col.querySelector('#save-config-btn').addEventListener('click', () => {
             const editor = col.querySelector('#config-editor');
@@ -330,30 +295,14 @@ export class TunnelTab {
         });
     }
 
-    getHeaders() {
-        const headers = { 'Content-Type': 'application/json' };
-        if (this.apiEmail) {
-            headers['X-Auth-Email'] = this.apiEmail;
-            headers['X-Auth-Key'] = this.apiToken;
-        } else {
-            headers['Authorization'] = `Bearer ${this.apiToken}`;
-        }
-        return headers;
-    }
-
     async fetchAccounts() {
-        this.state.loading = true;
-        this.renderUI();
+        this.state.loading = true; this.state.error = null; this.renderUI();
         try {
-            const res = await fetch(`${this.apiUrl}/accounts`, { headers: this.getHeaders() });
-            const data = await res.json();
-            if (data.success) {
-                this.state.accounts = data.result;
-            } else {
-                throw new Error(data.errors[0]?.message);
-            }
+            const res = await cfFetch(this.token, this.email, '/accounts');
+            this.state.accounts = Array.isArray(res) ? res : [];
         } catch (e) {
-            this.state.error = e.message;
+            console.error('Fetch accounts error:', e);
+            this.state.error = e.message || 'Failed to fetch accounts';
         } finally {
             this.state.loading = false;
             this.renderUI();
@@ -372,22 +321,14 @@ export class TunnelTab {
         this.state.selectedAccount = accountId;
         this.state.selectedTunnel = null;
         this.state.isEditingConfig = false;
-        this.fetchTunnels(accountId);
-    }
-
-    async fetchTunnels(accountId) {
-        this.state.loading = true;
-        this.renderUI();
+        
+        this.state.loading = true; this.state.error = null; this.renderUI();
         try {
-            const res = await fetch(`${this.apiUrl}/accounts/${accountId}/cfd_tunnel?is_deleted=false`, { headers: this.getHeaders() });
-            const data = await res.json();
-            if (data.success) {
-                this.state.tunnels = data.result;
-            } else {
-                throw new Error(data.errors[0]?.message);
-            }
+            const res = await cfFetch(this.token, this.email, `/accounts/${accountId}/cfd_tunnel?is_deleted=false`);
+            this.state.tunnels = Array.isArray(res) ? res : [];
         } catch (e) {
-            this.state.error = e.message;
+            console.error('Fetch tunnels error:', e);
+            this.state.error = e.message || 'Failed to fetch tunnels';
         } finally {
             this.state.loading = false;
             this.renderUI();
@@ -395,146 +336,84 @@ export class TunnelTab {
     }
 
     async selectTunnel(tunnelId) {
-        if (this.state.selectedTunnel && this.state.selectedTunnel.id === tunnelId) return;
-
+        if (this.state.selectedTunnel?.id === tunnelId) return;
         this.state.selectedTunnel = this.state.tunnels.find(t => t.id === tunnelId);
         this.state.isEditingConfig = false;
-        this.state.config = null; // Reset config
-        this.renderUI(); 
-        
-        // Fetch details in parallel
+        this.state.config = null;
+        this.renderUI();
+
         this.fetchTunnelConnections(this.state.selectedAccount, tunnelId);
         this.fetchTunnelConfig(this.state.selectedAccount, tunnelId);
     }
 
     async fetchTunnelConnections(accountId, tunnelId) {
-        // Silent update
         try {
-            const res = await fetch(`${this.apiUrl}/accounts/${accountId}/cfd_tunnel/${tunnelId}/connections`, { headers: this.getHeaders() });
-            const data = await res.json();
-            if (data.success) {
-                this.state.connections = data.result;
-                this.renderUI(); // Re-render to show connections
-            }
+            this.state.connections = await cfFetch(this.token, this.email, `/accounts/${accountId}/cfd_tunnel/${tunnelId}/connections`);
+            this.renderUI();
         } catch (e) {
             this.state.connections = [];
         }
     }
 
     async fetchTunnelConfig(accountId, tunnelId) {
-        this.state.loading = true;
-        this.renderUI();
+        this.state.loading = true; this.renderUI();
         try {
-            const res = await fetch(`${this.apiUrl}/accounts/${accountId}/cfd_tunnel/${tunnelId}/configurations`, { headers: this.getHeaders() });
-            const data = await res.json();
-            if (data.success) {
-                this.state.config = data.result;
-            } else {
-                // If 404 or empty, it might be locally managed or have no config
-                this.state.config = null;
-            }
-        } catch (e) {
-            console.error('Failed to fetch config', e);
-            this.state.config = null;
-        } finally {
-            this.state.loading = false;
-            this.renderUI();
-        }
+            this.state.config = await cfFetch(this.token, this.email, `/accounts/${accountId}/cfd_tunnel/${tunnelId}/configurations`);
+        } catch (e) { this.state.config = null; }
+        this.state.loading = false; this.renderUI();
     }
 
     async createTunnel(name) {
         const { selectedAccount } = this.state;
         if (!selectedAccount) return;
-
-        this.state.loading = true;
-        this.renderUI();
-
-        // Generate 32-byte random secret, base64 encoded
+        
+        this.state.loading = true; this.renderUI();
         const randomBytes = new Uint8Array(32);
         crypto.getRandomValues(randomBytes);
         const tunnelSecret = btoa(String.fromCharCode.apply(null, randomBytes));
 
         try {
-            const res = await fetch(`${this.apiUrl}/accounts/${selectedAccount}/cfd_tunnel`, {
+            const newTunnel = await cfFetch(this.token, this.email, `/accounts/${selectedAccount}/cfd_tunnel`, {
                 method: 'POST',
-                headers: this.getHeaders(),
-                body: JSON.stringify({
-                    name: name,
-                    tunnel_secret: tunnelSecret
-                })
+                body: JSON.stringify({ name, tunnel_secret: tunnelSecret })
             });
-            const data = await res.json();
-            if (data.success) {
-                const newTunnel = data.result;
-                this.state.tunnels.unshift(newTunnel);
-                this.state.isCreating = false;
-                this.selectTunnel(newTunnel.id);
-                alert(`Tunnel created successfully! \n\nToken: ${data.result.token || 'Hidden (check docs)'}\nSecret: ${tunnelSecret}`);
-            } else {
-                throw new Error(data.errors[0]?.message);
-            }
-        } catch (e) {
-            alert('Error creating tunnel: ' + e.message);
-        } finally {
-            this.state.loading = false;
-            this.renderUI();
-        }
+            this.state.tunnels.unshift(newTunnel);
+            this.state.isCreating = false;
+            this.selectTunnel(newTunnel.id);
+            alert(`Tunnel created successfully! \n\nToken: ${newTunnel.token || 'Hidden'}\nSecret: ${tunnelSecret}`);
+        } catch (e) { alert('Error: ' + e.message); }
+        this.state.loading = false; this.renderUI();
     }
 
     async saveTunnelConfig(newConfig) {
         const { selectedAccount, selectedTunnel } = this.state;
         if (!selectedAccount || !selectedTunnel) return;
 
-        this.state.loading = true;
-        this.renderUI();
+        this.state.loading = true; this.renderUI();
         try {
-            const res = await fetch(`${this.apiUrl}/accounts/${selectedAccount}/cfd_tunnel/${selectedTunnel.id}/configurations`, {
+            this.state.config = await cfFetch(this.token, this.email, `/accounts/${selectedAccount}/cfd_tunnel/${selectedTunnel.id}/configurations`, {
                 method: 'PUT',
-                headers: this.getHeaders(),
                 body: JSON.stringify(newConfig)
             });
-            const data = await res.json();
-            if (data.success) {
-                this.state.config = data.result;
-                this.state.isEditingConfig = false; // Close editor on success
-                alert('Configuration saved successfully!');
-            } else {
-                throw new Error(data.errors[0]?.message);
-            }
-        } catch (e) {
-            alert('Error saving config: ' + e.message);
-        } finally {
-            this.state.loading = false;
-            this.renderUI();
-        }
+            this.state.isEditingConfig = false;
+            alert('Saved successfully!');
+        } catch (e) { alert('Error: ' + e.message); }
+        this.state.loading = false; this.renderUI();
     }
 
     async deleteTunnel(tunnelId) {
         const { selectedAccount } = this.state;
         if (!selectedAccount) return;
 
-        this.state.loading = true;
-        this.renderUI();
+        this.state.loading = true; this.renderUI();
         try {
-            const res = await fetch(`${this.apiUrl}/accounts/${selectedAccount}/cfd_tunnel/${tunnelId}`, {
-                method: 'DELETE',
-                headers: this.getHeaders()
-            });
-            const data = await res.json();
-            if (data.success) {
-                this.state.tunnels = this.state.tunnels.filter(t => t.id !== tunnelId);
-                this.state.selectedTunnel = null;
-                this.state.isEditingConfig = false;
-                this.state.config = null;
-                alert('Tunnel deleted successfully!');
-            } else {
-                throw new Error(data.errors[0]?.message);
-            }
-        } catch (e) {
-            alert('Error deleting tunnel: ' + e.message);
-        } finally {
-            this.state.loading = false;
-            this.renderUI();
-        }
+            await cfFetch(this.token, this.email, `/accounts/${selectedAccount}/cfd_tunnel/${tunnelId}`, { method: 'DELETE' });
+            this.state.tunnels = this.state.tunnels.filter(t => t.id !== tunnelId);
+            this.state.selectedTunnel = null;
+            this.state.isEditingConfig = false;
+            this.state.config = null;
+            alert('Deleted successfully!');
+        } catch (e) { alert('Error: ' + e.message); }
+        this.state.loading = false; this.renderUI();
     }
 }

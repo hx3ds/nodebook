@@ -1,4 +1,5 @@
 import { BotsTab } from './tabs/BotsTab.js';
+import { UI } from '../../ui/index.js';
 
 export class TelegramPlugin {
     constructor() {
@@ -36,7 +37,7 @@ export class TelegramPlugin {
         }
 
         container.innerHTML = '';
-        const col = this.createColumn(container);
+        const col = UI.Layout.createColumn(container);
         
         if (this.tabs[tabId]) {
             this.tabs[tabId].render(col);
@@ -56,13 +57,6 @@ export class TelegramPlugin {
 
         const tabId = this.activeNavId;
         this.renderTab(tabId, this.container);
-    }
-
-    createColumn(parent) {
-        const col = document.createElement('div');
-        col.className = 'finder-column animate-in';
-        parent.appendChild(col);
-        return col;
     }
 
     initTabInstance(tabId) {
