@@ -78,6 +78,39 @@ export const room = {
         );
     },
 
+    // Cursor Glow Management
+    cursorGlowElement: null,
+
+    initCursorGlow() {
+        if (!this.cursorGlowElement) {
+            this.cursorGlowElement = document.createElement('div');
+            this.cursorGlowElement.className = 'cursor-glow';
+            document.body.appendChild(this.cursorGlowElement);
+        }
+    },
+
+    showCursorGlow(x, y) {
+        if (!this.cursorGlowElement) this.initCursorGlow();
+        this.cursorGlowElement.style.left = x + 'px';
+        this.cursorGlowElement.style.top = y + 'px';
+        this.cursorGlowElement.style.display = 'block';
+        // Force reflow to ensure transition happens if we were to fade it in, 
+        // but simple display block is fine for now.
+    },
+
+    updateCursorGlow(x, y) {
+        if (this.cursorGlowElement) {
+            this.cursorGlowElement.style.left = x + 'px';
+            this.cursorGlowElement.style.top = y + 'px';
+        }
+    },
+
+    hideCursorGlow() {
+        if (this.cursorGlowElement) {
+            this.cursorGlowElement.style.display = 'none';
+        }
+    },
+
     getAllArrows() {
         const arrows = [];
         this.boxes.forEach(box => {
@@ -305,7 +338,7 @@ export const room = {
                     if (selectedItem && selectedItem.tag && selectedItem.tag.color === color) {
                         selectedItem.tag = null;
                         if (isBoxMenu) {
-                            room.drawBox(selectedItem, false);
+                            room.drawBox(selectedItem, false, false);
                         } else {
                             room.drawArrow(selectedItem);
                         }
@@ -334,7 +367,7 @@ export const room = {
                             name: result.name
                         };
                         if (isBoxMenu) {
-                            room.drawBox(selectedItem, false);
+                            room.drawBox(selectedItem, false, false);
                         } else {
                             room.drawArrow(selectedItem);
                         }
@@ -389,7 +422,7 @@ export const room = {
                 name: existingTag && existingTag.color === color ? existingTag.name : defaultName
             };
         }
-        room.drawBox(box, false);
+        room.drawBox(box, false, false);
         room.pushHistory();
         room.saveState();
         this.hideContextMenu();
@@ -406,6 +439,9 @@ export const room = {
             box.linkedNotePath = null;
         } else if (type === 'html') {
             box.type = 'html';
+            box.linkedNotePath = null;
+        } else if (type === 'atxt') {
+            box.type = 'atxt';
             box.linkedNotePath = null;
         }
 
@@ -523,7 +559,7 @@ export const room = {
                 color: result.color,
                 name: result.name
             };
-            room.drawBox(box, false);
+            room.drawBox(box, false, false);
             room.pushHistory();
             room.saveState();
         }
@@ -910,12 +946,12 @@ export const room = {
     },
 
 
-    drawAll(fresh = false) {
-        room.drawBoxes(fresh);
+    drawAll(fresh = false, updateContent = true) {
+        room.drawBoxes(fresh, updateContent);
         room.drawArrows();
     },
 
-    drawBox(box, fresh = false) {
+    drawBox(box, fresh = false, updateContent = true) {
         if (!box) return;
         if (fresh) {
             const isSelected = room.selectedBox === box || room.selectedBoxes.includes(box);
@@ -974,18 +1010,25 @@ export const room = {
                     video.onpause = () => room.saveState();
                     video.onseeked = () => room.saveState();
                 });
+            } else if (box.type === 'atxt') {
+                textDiv.innerHTML = box.text || '';
+                textDiv.classList.add('atxt-content');
             } else {
                 textDiv.textContent = box.text || '';
             }
 
-            if (box.type === 'html') {
+            if (box.type === 'html' || box.type === 'atxt') {
                 boxDiv.addEventListener('dragover', handlers.handleBoxDragOver);
                 boxDiv.addEventListener('drop', handlers.handleBoxDrop);
             }
 
             let textBeforeEdit = box.text;
             textDiv.addEventListener('input', (e) => {
-                box.text = e.target.innerText;
+                if (box.type === 'atxt') {
+                    box.text = e.target.innerHTML;
+                } else {
+                    box.text = e.target.innerText;
+                }
                 delete box._markdownCache; e.stopPropagation();
             });
 
@@ -1101,7 +1144,10 @@ export const room = {
 
             // Update text content if changed (crucial for drop handling and collaborative sync)
             const textDiv = boxDiv.querySelector('.box-text');
-            if (textDiv && room.editingBox !== box) { // Don't update if currently editing
+            // Skip text update if we are just moving/panning/resizing to prevent flickering/re-rendering issues
+            const isMovingOrPanningOrResizing = this.event === 'movingBox' || this.event === 'panning' || this.event === 'resizingBox';
+            
+            if (textDiv && room.editingBox !== box && !isMovingOrPanningOrResizing && updateContent) { // Don't update if currently editing or moving or updateContent is false
                 if (box.type === 'markdown' && box.text) {
                     if (!box._markdownCache || box._markdownCache.text !== box.text) {
                         const html = room.parseMarkdown(box.text);
@@ -1134,6 +1180,10 @@ export const room = {
                             video.onseeked = () => room.saveState();
                         });
                      }
+                } else if (box.type === 'atxt') {
+                    if (textDiv.innerHTML !== (box.text || '')) {
+                        textDiv.innerHTML = box.text || '';
+                    }
                 } else {
                     // Plain text
                     if (textDiv.textContent !== (box.text || '')) {
@@ -1194,11 +1244,11 @@ export const room = {
         return tagDot;
     },
 
-    drawBoxes(fresh) {
+    drawBoxes(fresh, updateContent = true) {
         if (fresh) {
             room.element.querySelectorAll('.box').forEach(el => el.remove());
         }
-        room.boxes.forEach(box => room.drawBox(box, fresh));
+        room.boxes.forEach(box => room.drawBox(box, fresh, updateContent));
     },
 
     drawArrow(arrow) {
@@ -1557,20 +1607,29 @@ export const room = {
             box.element.classList.add('editing');
         }
         const textDiv = room.editingBox.element.querySelector('.box-text');
-        // If it's a markdown box, switch to source text for editing
-        if (box.type === 'markdown') {
-            textDiv.textContent = box.text || '';
-            textDiv.classList.remove('markdown-content');
-            textDiv.classList.add('markdown-mode');
-        } else if (box.type === 'html') {
-            if (textDiv.classList.contains('html-content')) {
-                box.text = textDiv.innerHTML;
-                box._htmlCache = Array.from(textDiv.childNodes);
-                textDiv.innerHTML = '';
-            }
-            textDiv.textContent = box.text || '';
-            textDiv.classList.remove('html-content');
-            textDiv.classList.add('html-mode');
+        
+        switch (box.type) {
+            case 'markdown':
+                textDiv.textContent = box.text || '';
+                textDiv.classList.remove('markdown-content');
+                textDiv.classList.add('markdown-mode');
+                break;
+            case 'html':
+                if (textDiv.classList.contains('html-content')) {
+                    box.text = textDiv.innerHTML;
+                    box._htmlCache = Array.from(textDiv.childNodes);
+                    textDiv.innerHTML = '';
+                }
+                textDiv.textContent = box.text || '';
+                textDiv.classList.remove('html-content');
+                textDiv.classList.add('html-mode');
+                break;
+            case 'atxt':
+                // Rich text box - keeps innerHTML
+                break;
+            default:
+                // Normal text box
+                break;
         }
         textDiv.contentEditable = 'true';
     },
@@ -1583,32 +1642,40 @@ export const room = {
                 room.editingBox.element.classList.remove('editing');
             }
             const textDiv = room.editingBox.element.querySelector('.box-text');
-            // If it's a markdown box, switch back to rendered view
-            if (room.editingBox.type === 'markdown') {
-                textDiv.classList.remove('markdown-mode');
-                // Clear cache and redraw to show rendered markdown
-                delete room.editingBox._markdownCache;
-                const html = room.parseMarkdown(room.editingBox.text);
-                room.editingBox._markdownCache = {
-                    text: room.editingBox.text,
-                    html: html
-                };
-                textDiv.innerHTML = html;
-                textDiv.classList.add('markdown-content');
-            } else if (room.editingBox.type === 'html') {
-                textDiv.classList.remove('html-mode');
-                
-                textDiv.innerHTML = '';
-                if (room.editingBox._htmlCache) {
-                    room.editingBox._htmlCache.forEach(el => textDiv.appendChild(el));
-                    delete room.editingBox._htmlCache;
-                }
-                
-                if (textDiv.innerHTML !== room.editingBox.text) {
-                    textDiv.innerHTML = room.editingBox.text;
-                }
-                
-                textDiv.classList.add('html-content');
+            
+            switch (room.editingBox.type) {
+                case 'markdown':
+                    textDiv.classList.remove('markdown-mode');
+                    // Clear cache and redraw to show rendered markdown
+                    delete room.editingBox._markdownCache;
+                    const html = room.parseMarkdown(room.editingBox.text);
+                    room.editingBox._markdownCache = {
+                        text: room.editingBox.text,
+                        html: html
+                    };
+                    textDiv.innerHTML = html;
+                    textDiv.classList.add('markdown-content');
+                    break;
+                case 'html':
+                    textDiv.classList.remove('html-mode');
+                    
+                    textDiv.innerHTML = '';
+                    if (room.editingBox._htmlCache) {
+                        room.editingBox._htmlCache.forEach(el => textDiv.appendChild(el));
+                        delete room.editingBox._htmlCache;
+                    }
+                    
+                    if (textDiv.innerHTML !== room.editingBox.text) {
+                        textDiv.innerHTML = room.editingBox.text;
+                    }
+                    
+                    textDiv.classList.add('html-content');
+                    break;
+                case 'atxt':
+                    // No special processing needed for atxt on finish editing
+                    break;
+                default:
+                    break;
             }
             
             textDiv.contentEditable = 'false';
@@ -1646,7 +1713,7 @@ export const room = {
         box.height = Math.max(room.minBoxHeight, newHeight);
         
         // Redraw the box with new dimensions
-        room.drawBox(box, false);
+        room.drawBox(box, false, false);
         
         // Push to history and save state
         room.pushHistory();
@@ -1806,6 +1873,7 @@ export const room = {
         const roomContextMenu = document.getElementById('roomContextMenu');
         const arrowContextMenu = document.getElementById('arrowContextMenu');
         const fileContextMenu = document.getElementById('fileContextMenu');
+        const textContextMenu = document.getElementById('textContextMenu');
         if (boxContextMenu) {
             boxContextMenu.style.display = 'none';
         }
@@ -1817,6 +1885,9 @@ export const room = {
         }
         if (fileContextMenu) {
             fileContextMenu.style.display = 'none';
+        }
+        if (textContextMenu) {
+            textContextMenu.style.display = 'none';
         }
         // Also hide all submenus
         this.hideAllSubmenus();
@@ -2328,7 +2399,236 @@ export const room = {
         this.offset.y = viewportCenterY - boxCenterY;
         
         // Redraw everything with the new offset (this pans the view)
-        this.drawAll(false);
+        // Pass false for updateContent to prevent text updates in drawBox during panning
+        this.drawAll(false, false);
         this.saveState();
+    },
+
+    // Text editing context menu methods
+    restoreSelection() {
+        if (this.savedRange) {
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(this.savedRange);
+        } else if (this.editingBox) {
+            // Fallback: focus the editing box
+            const textDiv = this.editingBox.element.querySelector('.box-text');
+            if (textDiv) textDiv.focus();
+        }
+    },
+
+    async textCopy() {
+        this.restoreSelection();
+        try {
+            const selection = window.getSelection();
+            if (selection.toString().length > 0) {
+                await navigator.clipboard.writeText(selection.toString());
+            }
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+            // Fallback
+            document.execCommand('copy');
+        }
+        this.hideContextMenu();
+    },
+
+    async textCut() {
+        this.restoreSelection();
+        try {
+            const selection = window.getSelection();
+            const text = selection.toString();
+            if (text.length > 0) {
+                await navigator.clipboard.writeText(text);
+                // Delete the selected text
+                if (selection.rangeCount > 0) {
+                    selection.deleteFromDocument();
+                }
+            }
+        } catch (err) {
+            console.error('Failed to cut text: ', err);
+            // Fallback
+            document.execCommand('cut');
+        }
+        this.hideContextMenu();
+    },
+
+    async textPaste() {
+        this.restoreSelection();
+        try {
+            // Try to read clipboard items first to check for images
+            let handled = false;
+            try {
+                const items = await navigator.clipboard.read();
+                for (const item of items) {
+                    const imageType = item.types.find(type => type.startsWith('image/'));
+                    if (imageType) {
+                        const blob = await item.getType(imageType);
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const imgHtml = `<img src="${e.target.result}" style="max-width: 100%; display: block;" contenteditable="false"><br>`;
+                            this.restoreSelection();
+                            document.execCommand('insertHTML', false, imgHtml);
+                            
+                            // Update box text if editing
+                            if (this.editingBox && this.editingBox.type === 'atxt') {
+                                const textDiv = this.editingBox.element.querySelector('.box-text');
+                                if (textDiv) {
+                                    this.editingBox.text = textDiv.innerHTML;
+                                    room.pushHistory();
+                                    room.saveState();
+                                }
+                            }
+                        };
+                        reader.readAsDataURL(blob);
+                        handled = true;
+                        break;
+                    }
+                }
+            } catch (e) {
+                // Clipboard read failed or permission denied, fall back to text
+                console.log('Clipboard read failed, falling back to text', e);
+            }
+
+            if (!handled) {
+                const text = await navigator.clipboard.readText();
+                // Use insertText command to handle undo history and clean insertion
+                // Although execCommand is obsolete, 'insertText' is still the most reliable way 
+                // to insert text at cursor position while preserving undo stack in contentEditable
+                const success = document.execCommand('insertText', false, text);
+                if (!success) {
+                    // Fallback for older browsers or if insertText fails
+                    const selection = window.getSelection();
+                    if (selection.rangeCount) {
+                        selection.deleteFromDocument();
+                        selection.getRangeAt(0).insertNode(document.createTextNode(text));
+                        // Move cursor to end of inserted text
+                        selection.collapseToEnd();
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Failed to read clipboard contents: ', err);
+            // Fallback to execCommand if clipboard API fails
+            document.execCommand('paste');
+        }
+        this.hideContextMenu();
+    },
+
+    textInsertImage() {
+        if (!this.editingBox || this.editingBox.type !== 'atxt') return;
+        this.restoreSelection();
+        
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                let src = '';
+                if (file.path) {
+                     src = `file://${file.path.replace(/\\/g, '/')}`;
+                     this._insertMediaHtml(`<img src="${src}" style="max-width: 100%; display: block;" contenteditable="false"><br>`);
+                } else {
+                     const reader = new FileReader();
+                     reader.onload = (evt) => {
+                        this._insertMediaHtml(`<img src="${evt.target.result}" style="max-width: 100%; display: block;" contenteditable="false"><br>`);
+                     };
+                     reader.readAsDataURL(file);
+                }
+            }
+        };
+        input.click();
+        this.hideContextMenu();
+    },
+
+    textInsertVideo() {
+        if (!this.editingBox || this.editingBox.type !== 'atxt') return;
+        this.restoreSelection();
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'video/*';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                 let src = '';
+                 if (file.path) {
+                     src = `file://${file.path.replace(/\\/g, '/')}`;
+                 } else {
+                     src = URL.createObjectURL(file);
+                 }
+                 this._insertMediaHtml(`<video src="${src}" controls style="max-width: 100%; display: block;" contenteditable="false"></video><br>`);
+            }
+        };
+        input.click();
+        this.hideContextMenu();
+    },
+
+    _insertMediaHtml(html) {
+        this.restoreSelection();
+        document.execCommand('insertHTML', false, html);
+        const textDiv = this.editingBox.element.querySelector('.box-text');
+        if (textDiv) {
+            this.editingBox.text = textDiv.innerHTML;
+            room.pushHistory();
+            room.saveState();
+        }
+    },
+
+    textFormat(command, value = null) {
+        if (!this.editingBox || this.editingBox.type !== 'atxt') return;
+        
+        // Restore selection
+        this.restoreSelection();
+
+        document.execCommand(command, false, value);
+        
+        // Force update box.text to save changes immediately
+        const textDiv = this.editingBox.element.querySelector('.box-text');
+        if (textDiv) {
+            this.editingBox.text = textDiv.innerHTML;
+            room.pushHistory();
+            room.saveState();
+        }
+        
+        this.hideContextMenu();
+    },
+
+    textSelectAll() {
+        if (this.editingBox) {
+            const textDiv = this.editingBox.element.querySelector('.box-text');
+            if (textDiv) {
+                const range = document.createRange();
+                range.selectNodeContents(textDiv);
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+        }
+        this.hideContextMenu();
+    },
+
+    showTextContextMenu(x, y) {
+        // Save current selection
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            this.savedRange = selection.getRangeAt(0);
+        } else {
+            this.savedRange = null;
+        }
+
+        const menu = document.getElementById('textContextMenu');
+        if (menu) {
+            // Show/hide formatting options based on box type
+            const formattingMenu = document.getElementById('textMenuFormatting');
+            if (formattingMenu) {
+                const isAtxt = this.editingBox && this.editingBox.type === 'atxt';
+                formattingMenu.style.display = isAtxt ? 'block' : 'none';
+            }
+
+            menu.style.display = 'block';
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+        }
     }
 };

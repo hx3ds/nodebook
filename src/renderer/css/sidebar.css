@@ -140,7 +140,7 @@
     width: 16px;
     height: 16px;
     flex-shrink: 0;
-    color: #90a4ae;
+    color: var(--sidebar-subtext);
 }
 
 /* Specific icon colors */
@@ -151,7 +151,7 @@
 
 /* File icon color when not selected */
 .tree-item-header[data-type="file"] .tree-item-icon {
-    color: #6a737d;
+    color: var(--sidebar-subtext);
 }
 
 /* Expand Arrow */
@@ -162,7 +162,7 @@
     width: 20px;
     height: 28px;
     flex-shrink: 0;
-    color: #959da5;
+    color: var(--sidebar-subtext);
     margin-right: 0px;
     transition: transform 0.15s;
 }

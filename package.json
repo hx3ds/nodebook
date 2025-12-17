@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "src/main/index.js",
   "scripts": {
+    "dev": "electron-forge start",
     "start": "electron-forge start",
     "electron:dev": "electron . --dev",
     "package": "electron-forge package",

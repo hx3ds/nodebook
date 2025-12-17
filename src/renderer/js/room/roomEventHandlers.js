@@ -68,11 +68,12 @@ export const roomEventHandlers = {
                 if (room.triggeringMovement) {
                     if (['box', 'box-text-container', 'box-arrow-container'].includes(elementType)) {
                         registerEvent('movingBox');
+                        room.showCursorGlow(e.clientX, e.clientY);
                         room.lastMousePos = pos;
                     } else if (elementType === 'room') {
                         registerEvent('panning');
+                        room.showCursorGlow(e.clientX, e.clientY);
                         room.lastPanPos = { x: e.clientX, y: e.clientY };
-                        room.element.style.cursor = 'grabbing';
                     }
                 }
             }, 200);
@@ -124,27 +125,16 @@ export const roomEventHandlers = {
                         break;
                 }
                 break;
-            case 1: // Middle click
-                switch (elementType) {
-                    case 'box-text-container':
-                    case 'box-arrow-container':
-                    case 'box':
-                        registerEvent('movingBox')
-                        e.preventDefault();
-                        e.stopPropagation();
-                        room.selectBox(owner, ifAppend);
-                        room.lastMousePos = pos;
-                        break;
-                    case 'room':
-                        registerEvent('panning')
-                        room.lastPanPos = { x: e.clientX, y: e.clientY };
-                        room.element.style.cursor = 'grab';
-                        break;
-                }
-                break;
             case 2: // Right click
                 e.preventDefault();
                 const menuPos = { x: e.clientX, y: e.clientY };
+
+                // If editing a box and right-clicked inside it, show text context menu
+                if (room.editingBox && room.editingBox === owner && elementType === 'box-text-container') {
+                    room.showTextContextMenu(menuPos.x, menuPos.y);
+                    return;
+                }
+
                 switch (elementType) {
                     case 'box-text-container':
                     case 'box-arrow-container':
@@ -223,7 +213,7 @@ export const roomEventHandlers = {
                     room.resizingBox.height = newHeight;
                 }
 
-                room.drawBox(room.resizingBox, false);
+                room.drawBox(room.resizingBox, false, false);
                 room.lastMousePos = pos;
                 break;
             case 'selectingArrow':
@@ -243,6 +233,7 @@ export const roomEventHandlers = {
             case 'movingBox': {
                 e.preventDefault();
                 e.stopPropagation();
+                room.updateCursorGlow(e.clientX, e.clientY);
                 const boxesToMove = room.selectedBoxes.length > 0 ? room.selectedBoxes :
                     (room.selectedBox ? [room.selectedBox] : []);
                 
@@ -252,7 +243,7 @@ export const roomEventHandlers = {
                 boxesToMove.forEach(box => {
                     box.x += dx;
                     box.y += dy;
-                    room.drawBox(box, false);
+                    room.drawBox(box, false, false);
                 });
                 room.lastMousePos = pos;
                 // Update arrows connected to moving boxes in real-time
@@ -260,14 +251,14 @@ export const roomEventHandlers = {
                 break;
             }
             case 'panning': {
+                room.updateCursorGlow(e.clientX, e.clientY);
                 const dx = e.clientX - room.lastPanPos.x;
                 const dy = e.clientY - room.lastPanPos.y;
                 room.offset.x += dx;
                 room.offset.y += dy;
                 room.lastPanPos = { x: e.clientX, y: e.clientY };
-                room.element.style.cursor = 'grabbing';
 
-                room.drawAll(false);
+                room.drawAll(false, false);
                 room.updateSelectionPreview();
                 break;
             }
@@ -342,11 +333,12 @@ export const roomEventHandlers = {
                 room.saveState();
                 room.drawArrows(); // Redraw arrows to update connections
                 room.lastMousePos = null;
+                room.hideCursorGlow();
                 break;
             case 'panning':
-                room.element.style.cursor = 'default';
                 room.lastPanPos = { x: 0, y: 0 };
                 room.saveState();
+                room.hideCursorGlow();
                 break;
         }
 
@@ -384,10 +376,12 @@ export const roomEventHandlers = {
                     room.pushHistory();
                     room.saveState();
                     room.drawArrows();
+                    room.hideCursorGlow();
                     break;
                 case 'panning':
                     // Just reset cursor
                     room.saveState();
+                    room.hideCursorGlow();
                     break;
             }
         }
@@ -407,7 +401,7 @@ export const roomEventHandlers = {
         e.stopPropagation();
         
         const boxDiv = e.target.closest('.box');
-        if (boxDiv && boxDiv.owner && boxDiv.owner.type === 'html') {
+        if (boxDiv && boxDiv.owner && (boxDiv.owner.type === 'html' || boxDiv.owner.type === 'atxt')) {
             e.dataTransfer.dropEffect = 'copy';
         } else {
             e.dataTransfer.dropEffect = 'none';
@@ -426,10 +420,9 @@ export const roomEventHandlers = {
         
         const box = boxDiv.owner;
 
-        if (box.type !== 'html') return;
+        if (box.type !== 'html' && box.type !== 'atxt') return;
 
-        let newContent = box.text || '';
-        let changed = false;
+        let addedHtml = '';
         
         for (const file of files) {
             const isImage = file.type.startsWith('image/');
@@ -440,25 +433,38 @@ export const roomEventHandlers = {
                 
                 if (filePath) {
                     filePath = filePath.replace(/\\/g, '/');
-                    // Ensure it starts with / if not windows drive? 
-                    // Windows path: D:/... -> file:///D:/...
-                    // Linux/Mac: /home/... -> file:///home/...
                     const src = `file://${filePath}`;
                     
                     if (isImage) {
-                        newContent += `<img src="${src}" style="max-width: 100%; display: block;">`;
-                        changed = true;
+                        if (box.type === 'atxt') {
+                             addedHtml += `<img src="${src}" style="max-width: 100%; display: block;" contenteditable="false"><br>`;
+                        } else {
+                             addedHtml += `<img src="${src}" style="max-width: 100%; display: block;"><br>`;
+                        }
                     } else {
-                        newContent += `<video src="${src}" controls style="max-width: 100%; display: block;"></video>`;
-                        changed = true;
+                        if (box.type === 'atxt') {
+                             addedHtml += `<video src="${src}" controls style="max-width: 100%; display: block;" contenteditable="false"></video><br>`;
+                        } else {
+                             addedHtml += `<video src="${src}" controls style="max-width: 100%; display: block;"></video><br>`;
+                        }
                     }
                 }
             }
         }
-        
-        if (changed) {
-            box.text = newContent;
-            room.drawBox(box, false);
+
+        if (addedHtml) {
+            if (room.editingBox === box && box.type === 'atxt') {
+                // Insert at cursor position if editing
+                const textDiv = box.element.querySelector('.box-text');
+                textDiv.focus();
+                // Use custom insert if possible, or execCommand for simplicity here
+                document.execCommand('insertHTML', false, addedHtml);
+                box.text = textDiv.innerHTML;
+            } else {
+                // Append to end
+                box.text = (box.text || '') + addedHtml;
+                room.drawBox(box, false);
+            }
             room.pushHistory();
             room.saveState();
         }
@@ -616,7 +622,6 @@ function wrapEvent() {
         case 'panning':
             // Reset cursor and pan state unless staying in pan
             if (room.event !== 'panning') {
-                room.element.style.cursor = 'default';
                 room.lastPanPos = { x: 0, y: 0 };
             }
             break;
@@ -644,10 +649,6 @@ function wrapEvent() {
     // This section ensures any cross-event setup is handled
     switch (room.event) {
         case 'selectingBox':
-            // Ensure cursor is appropriate for selection
-            if (room.last_event === 'panning') {
-                room.element.style.cursor = 'default';
-            }
             break;
 
         case 'creatingArrow':
@@ -686,12 +687,9 @@ function wrapEvent() {
             if (room.last_event === 'editingBox') {
                 room.finishEditing();
             }
-            room.element.style.cursor = 'grab';
             break;
 
         case 'panning':
-            // Set panning cursor
-            room.element.style.cursor = 'grab';
             break;
 
         case 'editingBox':
@@ -716,5 +714,6 @@ function wrapEvent() {
             // Hide any other context menus
             room.hideContextMenu();
             break;
+
     }
 }
