@@ -355,9 +355,7 @@
 
 .submenu {
     display: none;
-    position: absolute;
-    left: 100%;
-    top: -4px;
+    position: fixed;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -366,18 +364,33 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
     padding: 4px;
     min-width: 140px;
-    margin-left: 4px;
-}
-
-.menu-item-with-submenu:hover .submenu {
-    display: block;
+    z-index: 2100;
 }
 
 .submenu button {
-    padding: 6px 12px;
+    display: flex;
+    align-items: center;
     width: 100%;
-    text-align: left;
+    padding: 6px 12px;
+    background: none;
+    border: none;
     border-radius: 4px;
+    text-align: left;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: #1f1f1f;
+    transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+}
+
+.submenu button:hover {
+    background: rgba(26, 115, 232, 0.08);
+    color: #1a73e8;
+}
+
+.submenu button:active {
+    transform: scale(0.98);
 }
 
 .submenu-divider {
@@ -453,4 +466,10 @@
     transition: opacity 0.15s ease, transform 0.15s ease;
     display: none;
     backdrop-filter: blur(1px);
+}
+
+/* Search Highlight */
+::highlight(search-result) {
+    background-color: #fde047;
+    color: black;
 }

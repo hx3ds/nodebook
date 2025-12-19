@@ -154,6 +154,158 @@ export const controlEventHandler = {
         }
     },
 
+    // Search Handlers
+    handleSearchToggle() {
+        control.showSearch = !control.showSearch;
+        control.update();
+        if (!control.showSearch) {
+            controlEventHandler.clearSearchHighlight();
+        }
+    },
+
+    clearSearchHighlight() {
+        if (window.CSS && CSS.highlights) {
+            CSS.highlights.clear();
+        }
+    },
+
+    handleSearchInput(e) {
+        const query = e.target.value.toLowerCase();
+        control.searchQuery = query;
+        
+        if (!query) {
+            control.searchResults = [];
+            control.currentResultIndex = -1;
+            const countEl = document.getElementById('proj-search-results-count');
+            if(countEl) countEl.textContent = '';
+            controlEventHandler.clearSearchHighlight();
+            return;
+        }
+
+        const room = window.room;
+        if (!room || !room.boxes) return;
+
+        // Filter boxes with text content matching query
+        control.searchResults = room.boxes.filter(box => {
+            // If box has an element and rendered text content, use that
+            if (box.element) {
+                const textDiv = box.element.querySelector('.box-text');
+                if (textDiv) {
+                    return textDiv.textContent.toLowerCase().includes(query);
+                }
+            }
+            // Fallback to raw text if element not rendered yet
+            return box.text && box.text.toLowerCase().includes(query);
+        });
+        
+        control.currentResultIndex = control.searchResults.length > 0 ? 0 : -1;
+        
+        // Update count
+        controlEventHandler.updateSearchResultSelection();
+    },
+
+    handleSearchKeyDown(e) {
+        if (control.searchResults.length === 0) return;
+
+        if (e.key === 'Enter' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            control.currentResultIndex = (control.currentResultIndex + 1) % control.searchResults.length;
+            controlEventHandler.updateSearchResultSelection();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            control.currentResultIndex = (control.currentResultIndex - 1 + control.searchResults.length) % control.searchResults.length;
+            controlEventHandler.updateSearchResultSelection();
+        }
+    },
+
+    updateSearchResultSelection() {
+        const count = control.searchResults.length;
+        const countEl = document.getElementById('proj-search-results-count');
+        if (!countEl) return;
+        
+        if (count === 0) {
+            countEl.textContent = '0 results';
+            return;
+        }
+        
+        countEl.textContent = `${control.currentResultIndex + 1}/${count}`;
+            
+        const box = control.searchResults[control.currentResultIndex];
+        if (box) controlEventHandler.centerAndSelectBox(box);
+    },
+
+    centerAndSelectBox(box) {
+        const room = window.room;
+        if (!room) return;
+
+        // Exit edit mode if active
+        if (room.editingBox) {
+            room.finishEditing();
+        }
+
+        // Center box
+        const boxCenterX = box.x + box.width / 2;
+        const boxCenterY = box.y + box.height / 2;
+        
+        room.offset.x = (window.innerWidth / 2) - boxCenterX;
+        room.offset.y = (window.innerHeight / 2) - boxCenterY;
+        
+        // Select box
+        room.selectBox(box, false); // false = clear other selections
+        
+        // Redraw
+        room.drawAll(false, false);
+
+        // Highlight searched text
+        if (control.searchQuery && box.element) {
+            const textDiv = box.element.querySelector('.box-text');
+            if (textDiv) {
+                const query = control.searchQuery.toLowerCase();
+                
+                // Helper to find text node
+                const findTextNode = (node) => {
+                    if (node.nodeType === 3) {
+                        const text = node.textContent.toLowerCase();
+                        const idx = text.indexOf(query);
+                        if (idx !== -1) return { node, idx };
+                    } else if (node.nodeType === 1) {
+                        for (let child of node.childNodes) {
+                            const found = findTextNode(child);
+                            if (found) return found;
+                        }
+                    }
+                    return null;
+                };
+
+                const found = findTextNode(textDiv);
+                if (found && window.CSS && CSS.highlights && window.Highlight) {
+                    try {
+                        const range = document.createRange();
+                        range.setStart(found.node, found.idx);
+                        range.setEnd(found.node, found.idx + control.searchQuery.length);
+                        
+                        const highlight = new Highlight(range);
+                        CSS.highlights.set('search-result', highlight);
+                    } catch (e) {
+                        console.warn('Highlight failed:', e);
+                    }
+                } else if (!found) {
+                     controlEventHandler.clearSearchHighlight();
+                }
+            }
+        } else {
+             controlEventHandler.clearSearchHighlight();
+        }
+    },
+
+    handleGlobalKeyDown(e) {
+        // Ctrl+F or Cmd+F
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+            e.preventDefault();
+            controlEventHandler.handleSearchToggle();
+        }
+    },
+
     // Dragging Logic
     handleMouseDown(e) {
         // Only allow left click

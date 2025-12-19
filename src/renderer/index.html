@@ -14,32 +14,34 @@
 </head>
 <body>
     <!-- File Explorer Sidebar -->
-    <div id="sidebar">
-        <div id="sidebarHeader">
-            <div id="sidebarTitle">EXPLORER</div>
-            <div id="sidebarActions">
-                <button id="openFolderBtn" title="Open Folder">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h4.5c.625 0 1.25.196 1.768.558l.864.654c.518.362 1.142.558 1.768.558H19.5A2.25 2.25 0 0121.75 6v3.776" />
-                    </svg>
-                </button>
-                <button id="newFileBtn" title="New Note">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9zM12 10.5v6m3-3H9" />
-                    </svg>
-                </button>
-                <button id="newFolderBtn" title="New Folder">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5v6m3-3H9m4.06-7.19l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-                    </svg>
-                </button>
+    <div id="sidebarContainer">
+        <div id="sidebar">
+            <div id="sidebarHeader">
+                <div id="sidebarTitle">EXPLORER</div>
+                <div id="sidebarActions">
+                    <button id="openFolderBtn" title="Open Folder">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h4.5c.625 0 1.25.196 1.768.558l.864.654c.518.362 1.142.558 1.768.558H19.5A2.25 2.25 0 0121.75 6v3.776" />
+                        </svg>
+                    </button>
+                    <button id="newFileBtn" title="New Note">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9zM12 10.5v6m3-3H9" />
+                        </svg>
+                    </button>
+                    <button id="newFolderBtn" title="New Folder">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5v6m3-3H9m4.06-7.19l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="fileTree"></div>
+            <div id="sidebarFooter">
+                <div id="currentFolderPath"></div>
             </div>
         </div>
-        <div id="fileTree"></div>
-        <div id="sidebarFooter">
-            <div id="currentFolderPath"></div>
-            <div id="sidebarResizeHandle"></div>
-        </div>
+        <div id="sidebarResizer"></div>
     </div>
     
     <!-- Box Context Menu -->
@@ -50,59 +52,12 @@
         <button id="boxMenuDelete" onclick="room.deleteSelectedElement()">Delete <span class="menu-shortcut">Del</span></button>
         
         <div class="menu-divider"></div>
-        <div class="menu-item-with-submenu" id="boxMenuTagContainer">
+        <div class="menu-item-with-submenu" id="boxMenuTagContainer" data-submenu-id="boxTagMenu">
             <button id="boxMenuTag">Tag ›</button>
-            <div class="submenu" id="boxTagMenu">
-                <button onclick="room.setBoxTag(room.selectedBox, null)">Remove Tag</button>
-                <div class="submenu-divider"></div>
-                <div id="tagColors">
-                    <button data-color="#ef4444" onclick="room.setBoxTag(room.selectedBox, '#ef4444')">
-                        <span class="tag-dot-menu" style="background: #ef4444;"></span>
-                        <span>Red</span>
-                    </button>
-                    <button data-color="#f59e0b" onclick="room.setBoxTag(room.selectedBox, '#f59e0b')">
-                        <span class="tag-dot-menu" style="background: #f59e0b;"></span>
-                        <span>Orange</span>
-                    </button>
-                    <button data-color="#10b981" onclick="room.setBoxTag(room.selectedBox, '#10b981')">
-                        <span class="tag-dot-menu" style="background: #10b981;"></span>
-                        <span>Green</span>
-                    </button>
-                    <button data-color="#3b82f6" onclick="room.setBoxTag(room.selectedBox, '#3b82f6')">
-                        <span class="tag-dot-menu" style="background: #3b82f6;"></span>
-                        <span>Blue</span>
-                    </button>
-                    <button data-color="#8b5cf6" onclick="room.setBoxTag(room.selectedBox, '#8b5cf6')">
-                        <span class="tag-dot-menu" style="background: #8b5cf6;"></span>
-                        <span>Purple</span>
-                    </button>
-                    <button data-color="#ec4899" onclick="room.setBoxTag(room.selectedBox, '#ec4899')">
-                        <span class="tag-dot-menu" style="background: #ec4899;"></span>
-                        <span>Pink</span>
-                    </button>
-                    <button data-color="#6366f1" onclick="room.setBoxTag(room.selectedBox, '#6366f1')">
-                        <span class="tag-dot-menu" style="background: #6366f1;"></span>
-                        <span>Indigo</span>
-                    </button>
-                    <button data-color="#06b6d4" onclick="room.setBoxTag(room.selectedBox, '#06b6d4')">
-                        <span class="tag-dot-menu" style="background: #06b6d4;"></span>
-                        <span>Cyan</span>
-                    </button>
-                </div>
-                <div class="submenu-divider"></div>
-                <button onclick="room.addCustomBoxTag(room.selectedBox)">🎨 Custom Tag...</button>
-            </div>
         </div>
         
-        <div class="menu-item-with-submenu" id="boxMenuTypeContainer">
+        <div class="menu-item-with-submenu" id="boxMenuTypeContainer" data-submenu-id="boxTypeMenu">
             <button id="boxMenuType">Type ›</button>
-            <div class="submenu" id="boxTypeMenu">
-                <button id="boxTypeTextBtn" onclick="room.setBoxType(room.selectedBox, 'text')">📝 Text Box</button>
-                <button id="boxTypeMarkdownBtn" onclick="room.setBoxType(room.selectedBox, 'markdown')">📄 Markdown Box</button>
-                <button id="boxTypeHtmlBtn" onclick="room.setBoxType(room.selectedBox, 'html')">🌐 HTML Box</button>
-                <button id="boxTypeAtxtBtn" onclick="room.setBoxType(room.selectedBox, 'atxt')">✨ Rich Text Box</button>
-                <button id="boxTypeBookBtn" onclick="room.setBoxAsBookLink(room.selectedBox, explorer)">📖 Book Link</button>
-            </div>
         </div>
     </div>
     
@@ -110,48 +65,8 @@
     <div id="arrowContextMenu">
         <button id="arrowMenuDelete" onclick="room.deleteSelectedElement()">Delete <span class="menu-shortcut">Del</span></button>
         <div class="menu-divider"></div>
-        <div class="menu-item-with-submenu" id="arrowMenuTagContainer">
+        <div class="menu-item-with-submenu" id="arrowMenuTagContainer" data-submenu-id="arrowTagMenu">
             <button id="arrowMenuTag">Tag ›</button>
-            <div class="submenu" id="arrowTagMenu">
-                <button onclick="room.setArrowTag(room.selectedArrow, null)">Default</button>
-                <div class="submenu-divider"></div>
-                <div id="arrowTagColors">
-                    <button data-color="#ef4444" onclick="room.setArrowTag(room.selectedArrow, '#ef4444')">
-                        <span class="tag-dot-menu" style="background: #ef4444;"></span>
-                        <span>Red</span>
-                    </button>
-                    <button data-color="#f59e0b" onclick="room.setArrowTag(room.selectedArrow, '#f59e0b')">
-                        <span class="tag-dot-menu" style="background: #f59e0b;"></span>
-                        <span>Orange</span>
-                    </button>
-                    <button data-color="#10b981" onclick="room.setArrowTag(room.selectedArrow, '#10b981')">
-                        <span class="tag-dot-menu" style="background: #10b981;"></span>
-                        <span>Green</span>
-                    </button>
-                    <button data-color="#3b82f6" onclick="room.setArrowTag(room.selectedArrow, '#3b82f6')">
-                        <span class="tag-dot-menu" style="background: #3b82f6;"></span>
-                        <span>Blue</span>
-                    </button>
-                    <button data-color="#8b5cf6" onclick="room.setArrowTag(room.selectedArrow, '#8b5cf6')">
-                        <span class="tag-dot-menu" style="background: #8b5cf6;"></span>
-                        <span>Purple</span>
-                    </button>
-                    <button data-color="#ec4899" onclick="room.setArrowTag(room.selectedArrow, '#ec4899')">
-                        <span class="tag-dot-menu" style="background: #ec4899;"></span>
-                        <span>Pink</span>
-                    </button>
-                    <button data-color="#6366f1" onclick="room.setArrowTag(room.selectedArrow, '#6366f1')">
-                        <span class="tag-dot-menu" style="background: #6366f1;"></span>
-                        <span>Indigo</span>
-                    </button>
-                    <button data-color="#06b6d4" onclick="room.setArrowTag(room.selectedArrow, '#06b6d4')">
-                        <span class="tag-dot-menu" style="background: #06b6d4;"></span>
-                        <span>Cyan</span>
-                    </button>
-                </div>
-                <div class="submenu-divider"></div>
-                <button onclick="room.addCustomArrowTag(room.selectedArrow)">🎨 Custom Tag...</button>
-            </div>
         </div>
     </div>
     
@@ -162,9 +77,10 @@
             <div class="menu-divider"></div>
         </div>
         <button id="roomMenuResetPosition" onclick="projection.resetPan()">Reset Media Position</button>
-        <button id="roomMenuResetOverlay" onclick="control.resetPosition()">Reset Overlay Position</button>
         <button id="roomMenuToggleSidebar" onclick="room.toggleSidebar()">Hide Sidebar</button>
         <button id="roomMenuToggleControls" onclick="room.toggleControls()">Toggle Controls</button>
+        <button id="roomMenuResetOverlay" onclick="control.resetPosition()">Reset Controls Position</button>
+
     </div>
     
     <!-- File Context Menu -->
@@ -172,6 +88,8 @@
         <button id="fileMenuOpen">Open</button>
         <button id="fileMenuRename">Rename</button>
         <button id="fileMenuDelete">Delete</button>
+        <div class="menu-divider"></div>
+        <button id="fileMenuHideSidebar">Hide Sidebar</button>
     </div>
 
     <!-- Text Edit Context Menu -->
@@ -188,51 +106,20 @@
             <button onclick="room.textFormat('italic')"><i>Italic</i> <span class="menu-shortcut">Ctrl+I</span></button>
             <button onclick="room.textFormat('underline')"><u>Underline</u> <span class="menu-shortcut">Ctrl+U</span></button>
             
-            <div class="menu-item-with-submenu">
-                <button>Font ›</button>
-                <div class="submenu">
-                    <button onclick="room.textFormat('fontName', 'Arial')">Arial</button>
-                    <button onclick="room.textFormat('fontName', 'Times New Roman')">Times New Roman</button>
-                    <button onclick="room.textFormat('fontName', 'Courier New')">Courier New</button>
-                    <button onclick="room.textFormat('fontName', 'Georgia')">Georgia</button>
-                    <button onclick="room.textFormat('fontName', 'Verdana')">Verdana</button>
-                </div>
+            <div class="menu-item-with-submenu" id="textMenuFontContainer" data-submenu-id="textMenuFontSubmenu">
+                <button id="textMenuFont">Font ›</button>
             </div>
             
-            <div class="menu-item-with-submenu">
-                <button>Size ›</button>
-                <div class="submenu">
-                    <button onclick="room.textFormat('fontSize', '1')">Tiny</button>
-                    <button onclick="room.textFormat('fontSize', '2')">Small</button>
-                    <button onclick="room.textFormat('fontSize', '3')">Normal</button>
-                    <button onclick="room.textFormat('fontSize', '4')">Large</button>
-                    <button onclick="room.textFormat('fontSize', '5')">Huge</button>
-                    <button onclick="room.textFormat('fontSize', '6')">Giant</button>
-                    <button onclick="room.textFormat('fontSize', '7')">Massive</button>
-                </div>
+            <div class="menu-item-with-submenu" id="textMenuSizeContainer" data-submenu-id="textMenuSizeSubmenu">
+                <button id="textMenuSize">Size ›</button>
             </div>
             
-            <div class="menu-item-with-submenu">
-                <button>Color ›</button>
-                <div class="submenu">
-                    <button onclick="room.textFormat('foreColor', '#000000')"><span class="tag-dot-menu" style="background: #000000;"></span> Black</button>
-                    <button onclick="room.textFormat('foreColor', '#ef4444')"><span class="tag-dot-menu" style="background: #ef4444;"></span> Red</button>
-                    <button onclick="room.textFormat('foreColor', '#f59e0b')"><span class="tag-dot-menu" style="background: #f59e0b;"></span> Orange</button>
-                    <button onclick="room.textFormat('foreColor', '#10b981')"><span class="tag-dot-menu" style="background: #10b981;"></span> Green</button>
-                    <button onclick="room.textFormat('foreColor', '#3b82f6')"><span class="tag-dot-menu" style="background: #3b82f6;"></span> Blue</button>
-                    <button onclick="room.textFormat('foreColor', '#8b5cf6')"><span class="tag-dot-menu" style="background: #8b5cf6;"></span> Purple</button>
-                </div>
+            <div class="menu-item-with-submenu" id="textMenuColorContainer" data-submenu-id="textMenuColorSubmenu">
+                <button id="textMenuColor">Color ›</button>
             </div>
             
-            <div class="menu-item-with-submenu">
-                <button>Highlight ›</button>
-                <div class="submenu">
-                    <button onclick="room.textFormat('hiliteColor', '#fef08a')"><span class="tag-dot-menu" style="background: #fef08a;"></span> Yellow</button>
-                    <button onclick="room.textFormat('hiliteColor', '#bbf7d0')"><span class="tag-dot-menu" style="background: #bbf7d0;"></span> Green</button>
-                    <button onclick="room.textFormat('hiliteColor', '#bae6fd')"><span class="tag-dot-menu" style="background: #bae6fd;"></span> Blue</button>
-                    <button onclick="room.textFormat('hiliteColor', '#fbcfe8')"><span class="tag-dot-menu" style="background: #fbcfe8;"></span> Pink</button>
-                    <button onclick="room.textFormat('hiliteColor', 'transparent')"><span class="tag-dot-menu" style="background: white; border: 1px solid #ccc;"></span> None</button>
-                </div>
+            <div class="menu-item-with-submenu" id="textMenuHighlightContainer" data-submenu-id="textMenuHighlightSubmenu">
+                <button id="textMenuHighlight">Highlight ›</button>
             </div>
             
             <button onclick="room.textFormat('insertUnorderedList')">Bullet List</button>
@@ -279,7 +166,6 @@
                 </div>
             </div>
             <div id="customTagDialogFooter">
-                <button id="customTagDialogRemove" style="display: none;">Remove Tag</button>
                 <button id="customTagDialogCancel">Cancel</button>
                 <button id="customTagDialogConfirm">Create</button>
             </div>
@@ -397,6 +283,13 @@
                         </svg>
                     </button>
                     
+                    <!-- Search Toggle -->
+                    <button class="control-btn" id="proj-search-toggle" title="Search">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                        </svg>
+                    </button>
+                    
                     <!-- Toggle Panel -->
                     <button class="control-btn" id="proj-panel-toggle" title="Hide Panel">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
@@ -409,6 +302,13 @@
 
         <div class="controls-secondary-container">
             <div class="controls-secondary-group">
+
+                <!-- Search Bar -->
+                <div class="search-bar-container hidden" id="proj-search-bar">
+                    <input type="text" class="search-input" id="proj-search-input" placeholder="Search notes...">
+                    <span class="search-results-count" id="proj-search-results-count"></span>
+                </div>
+
                 <!-- Seek Bar -->
                 <div class="seek-bar-container hidden" id="proj-seek-bar">
                     <span class="time-display" id="proj-time-current">0:00</span>
@@ -444,6 +344,134 @@
                 <!-- Playlist Overlay -->
                 <div id="proj-playlist-overlay" class="playlist-container" style="display: none;"></div>
             </div>
+        </div>
+    </div>
+    
+    <div id="submenus-container">
+        <!-- Box Submenus -->
+        <div class="submenu" id="boxTagMenu">
+            <div id="tagColors">
+                <button data-color="#ef4444" onclick="room.setBoxTag(room.selectedBox, '#ef4444')">
+                    <span class="tag-dot-menu" style="background: #ef4444;"></span>
+                    <span>Red</span>
+                </button>
+                <button data-color="#f59e0b" onclick="room.setBoxTag(room.selectedBox, '#f59e0b')">
+                    <span class="tag-dot-menu" style="background: #f59e0b;"></span>
+                    <span>Orange</span>
+                </button>
+                <button data-color="#10b981" onclick="room.setBoxTag(room.selectedBox, '#10b981')">
+                    <span class="tag-dot-menu" style="background: #10b981;"></span>
+                    <span>Green</span>
+                </button>
+                <button data-color="#3b82f6" onclick="room.setBoxTag(room.selectedBox, '#3b82f6')">
+                    <span class="tag-dot-menu" style="background: #3b82f6;"></span>
+                    <span>Blue</span>
+                </button>
+                <button data-color="#8b5cf6" onclick="room.setBoxTag(room.selectedBox, '#8b5cf6')">
+                    <span class="tag-dot-menu" style="background: #8b5cf6;"></span>
+                    <span>Purple</span>
+                </button>
+                <button data-color="#ec4899" onclick="room.setBoxTag(room.selectedBox, '#ec4899')">
+                    <span class="tag-dot-menu" style="background: #ec4899;"></span>
+                    <span>Pink</span>
+                </button>
+                <button data-color="#6366f1" onclick="room.setBoxTag(room.selectedBox, '#6366f1')">
+                    <span class="tag-dot-menu" style="background: #6366f1;"></span>
+                    <span>Indigo</span>
+                </button>
+                <button data-color="#06b6d4" onclick="room.setBoxTag(room.selectedBox, '#06b6d4')">
+                    <span class="tag-dot-menu" style="background: #06b6d4;"></span>
+                    <span>Cyan</span>
+                </button>
+            </div>
+            <div class="submenu-divider"></div>
+            <button onclick="room.addCustomBoxTag(room.selectedBox)">🎨 Custom Tag...</button>
+        </div>
+
+        <div class="submenu" id="boxTypeMenu">
+            <button id="boxTypeTextBtn" onclick="room.setBoxType(room.selectedBox, 'text')">📝 Text Box</button>
+            <button id="boxTypeMarkdownBtn" onclick="room.setBoxType(room.selectedBox, 'markdown')">📄 Markdown Box</button>
+            <button id="boxTypeHtmlBtn" onclick="room.setBoxType(room.selectedBox, 'html')">🌐 HTML Box</button>
+            <button id="boxTypeAtxtBtn" onclick="room.setBoxType(room.selectedBox, 'atxt')">✨ Rich Text Box</button>
+            <button id="boxTypeBookBtn" onclick="room.setBoxAsBookLink(room.selectedBox, explorer)">📖 Book Link</button>
+        </div>
+
+        <!-- Arrow Submenus -->
+        <div class="submenu" id="arrowTagMenu">
+            <button onclick="room.setArrowTag(room.selectedArrow, null)">Default</button>
+            <div class="submenu-divider"></div>
+            <div id="arrowTagColors">
+                <button data-color="#ef4444" onclick="room.setArrowTag(room.selectedArrow, '#ef4444')">
+                    <span class="tag-dot-menu" style="background: #ef4444;"></span>
+                    <span>Red</span>
+                </button>
+                <button data-color="#f59e0b" onclick="room.setArrowTag(room.selectedArrow, '#f59e0b')">
+                    <span class="tag-dot-menu" style="background: #f59e0b;"></span>
+                    <span>Orange</span>
+                </button>
+                <button data-color="#10b981" onclick="room.setArrowTag(room.selectedArrow, '#10b981')">
+                    <span class="tag-dot-menu" style="background: #10b981;"></span>
+                    <span>Green</span>
+                </button>
+                <button data-color="#3b82f6" onclick="room.setArrowTag(room.selectedArrow, '#3b82f6')">
+                    <span class="tag-dot-menu" style="background: #3b82f6;"></span>
+                    <span>Blue</span>
+                </button>
+                <button data-color="#8b5cf6" onclick="room.setArrowTag(room.selectedArrow, '#8b5cf6')">
+                    <span class="tag-dot-menu" style="background: #8b5cf6;"></span>
+                    <span>Purple</span>
+                </button>
+                <button data-color="#ec4899" onclick="room.setArrowTag(room.selectedArrow, '#ec4899')">
+                    <span class="tag-dot-menu" style="background: #ec4899;"></span>
+                    <span>Pink</span>
+                </button>
+                <button data-color="#6366f1" onclick="room.setArrowTag(room.selectedArrow, '#6366f1')">
+                    <span class="tag-dot-menu" style="background: #6366f1;"></span>
+                    <span>Indigo</span>
+                </button>
+                <button data-color="#06b6d4" onclick="room.setArrowTag(room.selectedArrow, '#06b6d4')">
+                    <span class="tag-dot-menu" style="background: #06b6d4;"></span>
+                    <span>Cyan</span>
+                </button>
+            </div>
+            <div class="submenu-divider"></div>
+            <button onclick="room.addCustomArrowTag(room.selectedArrow)">🎨 Custom Tag...</button>
+        </div>
+
+        <!-- Text Submenus -->
+        <div class="submenu" id="textMenuFontSubmenu">
+            <button onclick="room.textFormat('fontName', 'Arial')">Arial</button>
+            <button onclick="room.textFormat('fontName', 'Times New Roman')">Times New Roman</button>
+            <button onclick="room.textFormat('fontName', 'Courier New')">Courier New</button>
+            <button onclick="room.textFormat('fontName', 'Georgia')">Georgia</button>
+            <button onclick="room.textFormat('fontName', 'Verdana')">Verdana</button>
+        </div>
+
+        <div class="submenu" id="textMenuSizeSubmenu">
+            <button onclick="room.textFormat('fontSize', '1')">Tiny</button>
+            <button onclick="room.textFormat('fontSize', '2')">Small</button>
+            <button onclick="room.textFormat('fontSize', '3')">Normal</button>
+            <button onclick="room.textFormat('fontSize', '4')">Large</button>
+            <button onclick="room.textFormat('fontSize', '5')">Huge</button>
+            <button onclick="room.textFormat('fontSize', '6')">Giant</button>
+            <button onclick="room.textFormat('fontSize', '7')">Massive</button>
+        </div>
+
+        <div class="submenu" id="textMenuColorSubmenu">
+            <button onclick="room.textFormat('foreColor', '#000000')"><span class="tag-dot-menu" style="background: #000000;"></span> Black</button>
+            <button onclick="room.textFormat('foreColor', '#ef4444')"><span class="tag-dot-menu" style="background: #ef4444;"></span> Red</button>
+            <button onclick="room.textFormat('foreColor', '#f59e0b')"><span class="tag-dot-menu" style="background: #f59e0b;"></span> Orange</button>
+            <button onclick="room.textFormat('foreColor', '#10b981')"><span class="tag-dot-menu" style="background: #10b981;"></span> Green</button>
+            <button onclick="room.textFormat('foreColor', '#3b82f6')"><span class="tag-dot-menu" style="background: #3b82f6;"></span> Blue</button>
+            <button onclick="room.textFormat('foreColor', '#8b5cf6')"><span class="tag-dot-menu" style="background: #8b5cf6;"></span> Purple</button>
+        </div>
+
+        <div class="submenu" id="textMenuHighlightSubmenu">
+            <button onclick="room.textFormat('hiliteColor', '#fef08a')"><span class="tag-dot-menu" style="background: #fef08a;"></span> Yellow</button>
+            <button onclick="room.textFormat('hiliteColor', '#bbf7d0')"><span class="tag-dot-menu" style="background: #bbf7d0;"></span> Green</button>
+            <button onclick="room.textFormat('hiliteColor', '#bae6fd')"><span class="tag-dot-menu" style="background: #bae6fd;"></span> Blue</button>
+            <button onclick="room.textFormat('hiliteColor', '#fbcfe8')"><span class="tag-dot-menu" style="background: #fbcfe8;"></span> Pink</button>
+            <button onclick="room.textFormat('hiliteColor', 'transparent')"><span class="tag-dot-menu" style="background: white; border: 1px solid #ccc;"></span> None</button>
         </div>
     </div>
     

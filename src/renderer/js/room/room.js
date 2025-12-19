@@ -38,6 +38,7 @@ export const room = {
     lastClickOwner: null,
 
     tagNames: {
+        'transparent': 'Transparent',
         '#ef4444': 'Red',
         '#f59e0b': 'Orange',
         '#10b981': 'Green',
@@ -133,7 +134,7 @@ export const room = {
             text: '',
             selected: false,
             expanded: false,
-            tag: null,
+            tag: { color: 'transparent', name: 'Transparent' },
             type: 'text',
             linkedNotePath: null,
             scrollOffset: 0,
@@ -327,7 +328,7 @@ export const room = {
                 const currentTag = { color, name };
                 
                 // Show custom tag dialog for editing
-                const result = await room.showCustomTagDialog(currentTag, true);
+                const result = await room.showCustomTagDialog(currentTag, false);
                 
                 if (result === 'remove') {
                     // Remove from tagNames dictionary
@@ -412,16 +413,11 @@ export const room = {
 
     setBoxTag(box, color) {
         if (!box) return;
-        if (color === null) {
-            box.tag = null;
-        } else {
-            const existingTag = box.tag;
-            const defaultName = this.tagNames[color] || '';
-            box.tag = {
-                color: color,
-                name: existingTag && existingTag.color === color ? existingTag.name : defaultName
-            };
-        }
+        const targetColor = color || 'transparent';
+        box.tag = {
+            color: targetColor,
+            name: this.tagNames[targetColor] || 'Transparent'
+        };
         room.drawBox(box, false, false);
         room.pushHistory();
         room.saveState();
@@ -811,6 +807,30 @@ export const room = {
         }
     },
 
+    adjustMenuPosition(menu, x, y) {
+        menu.style.display = 'block'; // Show to measure
+        const rect = menu.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        let newX = x;
+        let newY = y;
+        
+        if (newX + rect.width > viewportWidth) {
+            newX = viewportWidth - rect.width - 10;
+        }
+        
+        if (newY + rect.height > viewportHeight) {
+            newY = viewportHeight - rect.height - 10;
+        }
+        
+        if (newX < 0) newX = 10;
+        if (newY < 0) newY = 10;
+        
+        menu.style.left = newX + 'px';
+        menu.style.top = newY + 'px';
+    },
+
     showBoxContextMenu(x, y) {
         const menu = document.getElementById('boxContextMenu');
         const copy = document.getElementById('boxMenuCopy');
@@ -835,17 +855,32 @@ export const room = {
 
         if (tagContainer) {
             tagContainer.style.display = this.selectedBox ? 'block' : 'none';
+            if (this.selectedBox) {
+                const tagBtn = document.getElementById('boxMenuTag');
+                if (tagBtn) {
+                    let tagName = 'Transparent';
+                    if (this.selectedBox.tag && this.selectedBox.tag.color) {
+                        tagName = this.selectedBox.tag.name || this.tagNames[this.selectedBox.tag.color] || this.selectedBox.tag.color;
+                    }
+                    tagBtn.textContent = `Tag: ${tagName} ›`;
+                }
+            }
         }
 
         if (typeContainer) {
             typeContainer.style.display = this.selectedBox ? 'block' : 'none';
+            if (this.selectedBox) {
+                const typeBtn = document.getElementById('boxMenuType');
+                if (typeBtn) {
+                    const typeName = this.selectedBox.type ? (this.selectedBox.type.charAt(0).toUpperCase() + this.selectedBox.type.slice(1)) : 'Unknown';
+                    typeBtn.textContent = `Type: ${typeName} ›`;
+                }
+            }
         }
 
         this.populateTagColors(this.tagNames, this.selectedBox);
 
-        menu.style.display = 'block';
-        menu.style.left = x + 'px';
-        menu.style.top = y + 'px';
+        this.adjustMenuPosition(menu, x, y);
     },
 
     showArrowContextMenu(x, y) {
@@ -865,9 +900,7 @@ export const room = {
 
         this.populateArrowColors(this.tagNames, room.selectedArrow);
 
-        menu.style.display = 'block';
-        menu.style.left = x + 'px';
-        menu.style.top = y + 'px';
+        this.adjustMenuPosition(menu, x, y);
     },
 
     showRoomContextMenu(x, y, options = {}) {
@@ -875,7 +908,7 @@ export const room = {
         const pasteContainer = document.getElementById('roomMenuPasteContainer');
         const resetBtn = document.getElementById('roomMenuResetPosition');
         const toggleSidebarBtn = document.getElementById('roomMenuToggleSidebar');
-        const sidebar = document.getElementById('sidebar');
+        const sidebarContainer = document.getElementById('sidebarContainer');
         
         const toggleControlsBtn = document.getElementById('roomMenuToggleControls');
         const controls = document.getElementById('controls-layer');
@@ -888,8 +921,8 @@ export const room = {
             resetBtn.style.display = options.isProjection ? 'block' : 'none';
         }
 
-        if (toggleSidebarBtn && sidebar) {
-            toggleSidebarBtn.textContent = sidebar.classList.contains('collapsed') ? 'Show Sidebar' : 'Hide Sidebar';
+        if (toggleSidebarBtn && sidebarContainer) {
+            toggleSidebarBtn.textContent = sidebarContainer.classList.contains('collapsed') ? 'Show Sidebar' : 'Hide Sidebar';
         }
         
         if (toggleControlsBtn && controls) {
@@ -897,14 +930,12 @@ export const room = {
             toggleControlsBtn.textContent = isHidden ? 'Show Controls' : 'Hide Controls';
         }
 
-        menu.style.display = 'block';
-        menu.style.left = x + 'px';
-        menu.style.top = y + 'px';
+        this.adjustMenuPosition(menu, x, y);
     },
 
     toggleSidebar() {
-        const sidebar = document.getElementById('sidebar');
-        const isCurrentlyCollapsed = sidebar.classList.toggle('collapsed');
+        const sidebarContainer = document.getElementById('sidebarContainer');
+        const isCurrentlyCollapsed = sidebarContainer.classList.toggle('collapsed');
         localStorage.setItem('sidebarCollapsed', isCurrentlyCollapsed);
 
         setTimeout(() => {
@@ -926,7 +957,7 @@ export const room = {
     },
 
     showTagTooltip(box) {
-        if (!box.tag || !box.tag.color) return;
+        if (!box.tag || !box.tag.color || box.tag.color === 'transparent') return;
         const tooltip = document.getElementById('tagTooltip');
         if (!tooltip) return;
         const tagName = box.tag.name || this.tagNames[box.tag.color] || box.tag.color;
@@ -934,8 +965,14 @@ export const room = {
         if (tooltip.style.display === 'none') {
             tooltip.style.display = 'block';
         }
-        tooltip.style.left = (box.x + room.offset.x + 20) + 'px';
-        tooltip.style.top = (box.y + room.offset.y + 6) + 'px';
+        
+        if (box.maximized) {
+            tooltip.style.left = '23px';
+            tooltip.style.top = '9px';
+        } else {
+            tooltip.style.left = (box.x + room.offset.x + 20) + 'px';
+            tooltip.style.top = (box.y + room.offset.y + 6) + 'px';
+        }
     },
 
     hideTagTooltip() {
@@ -953,6 +990,12 @@ export const room = {
 
     drawBox(box, fresh = false, updateContent = true) {
         if (!box) return;
+
+        // Ensure box always has a tag, defaulting to transparent
+        if (!box.tag) {
+            box.tag = { color: 'transparent', name: 'Transparent' };
+        }
+
         if (fresh) {
             const isSelected = room.selectedBox === box || room.selectedBoxes.includes(box);
 
@@ -1013,6 +1056,16 @@ export const room = {
             } else if (box.type === 'atxt') {
                 textDiv.innerHTML = box.text || '';
                 textDiv.classList.add('atxt-content');
+                // Restore video time if present
+                textDiv.querySelectorAll('video').forEach(video => {
+                    const time = parseFloat(video.getAttribute('data-start-time'));
+                    if (!isNaN(time) && isFinite(time)) {
+                        video.currentTime = time;
+                    }
+                    // Auto-save on video interaction
+                    video.onpause = () => room.saveState();
+                    video.onseeked = () => room.saveState();
+                });
             } else {
                 textDiv.textContent = box.text || '';
             }
@@ -1082,15 +1135,28 @@ export const room = {
                 boxDiv.classList.remove('selected');
             }
 
-            const newLeft = (box.x + room.offset.x) + 'px';
-            const newTop = (box.y + room.offset.y) + 'px';
-            if (boxDiv.style.left !== newLeft) boxDiv.style.left = newLeft;
-            if (boxDiv.style.top !== newTop) boxDiv.style.top = newTop;
+            if (box.maximized) {
+                if (boxDiv.style.position !== 'fixed') boxDiv.style.position = 'fixed';
+                if (boxDiv.style.left !== '0px') boxDiv.style.left = '0px';
+                if (boxDiv.style.top !== '0px') boxDiv.style.top = '0px';
+                if (boxDiv.style.width !== '100vw') boxDiv.style.width = '100vw';
+                if (boxDiv.style.height !== '100vh') boxDiv.style.height = '100vh';
+                if (boxDiv.style.zIndex !== '1000') boxDiv.style.zIndex = '1000';
+            } else {
+                if (boxDiv.style.position === 'fixed') {
+                    boxDiv.style.position = 'absolute';
+                    boxDiv.style.zIndex = '';
+                }
+                const newLeft = (box.x + room.offset.x) + 'px';
+                const newTop = (box.y + room.offset.y) + 'px';
+                if (boxDiv.style.left !== newLeft) boxDiv.style.left = newLeft;
+                if (boxDiv.style.top !== newTop) boxDiv.style.top = newTop;
 
-            const newWidth = box.width + 'px';
-            const newHeight = box.height + 'px';
-            if (boxDiv.style.width !== newWidth) boxDiv.style.width = newWidth;
-            if (boxDiv.style.height !== newHeight) boxDiv.style.height = newHeight;
+                const newWidth = box.width + 'px';
+                const newHeight = box.height + 'px';
+                if (boxDiv.style.width !== newWidth) boxDiv.style.width = newWidth;
+                if (boxDiv.style.height !== newHeight) boxDiv.style.height = newHeight;
+            }
 
             const existingTagDot = boxDiv.querySelector('.tag-dot');
             const hasTag = box.tag && box.tag.color;
@@ -1183,6 +1249,16 @@ export const room = {
                 } else if (box.type === 'atxt') {
                     if (textDiv.innerHTML !== (box.text || '')) {
                         textDiv.innerHTML = box.text || '';
+                        // Restore video time if present
+                        textDiv.querySelectorAll('video').forEach(video => {
+                            const time = parseFloat(video.getAttribute('data-start-time'));
+                            if (!isNaN(time) && isFinite(time)) {
+                                video.currentTime = time;
+                            }
+                            // Auto-save on video interaction
+                            video.onpause = () => room.saveState();
+                            video.onseeked = () => room.saveState();
+                        });
                     }
                 } else {
                     // Plain text
@@ -1209,17 +1285,26 @@ export const room = {
         return icon;
     },
 
+    toggleMaximizeBox(box) {
+        if (!box) return;
+        box.maximized = !box.maximized;
+        room.drawBox(box, false, false);
+        room.pushHistory();
+        room.saveState();
+    },
+
     createTagDotElement(color, box) {
         const tagDot = document.createElement('div');
         tagDot.className = 'tag-dot';
         tagDot.style.background = color;
+        if (color === 'transparent') {
+            tagDot.style.border = 'none';
+        }
         tagDot._isTagDot = true;
         tagDot.addEventListener('click', (e) => {
             e.stopPropagation();
         });
-        tagDot.addEventListener('dblclick', (e) => {
-            e.stopPropagation();
-        });
+        // Double click is handled in roomEventHandlers.js via handleDblClick/handleMouseDown custom detection
         tagDot.addEventListener('contextmenu', async (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -1898,7 +1983,16 @@ export const room = {
         const menuItemsWithSubmenu = document.querySelectorAll('.menu-item-with-submenu');
         
         menuItemsWithSubmenu.forEach(menuItem => {
-            const submenu = menuItem.querySelector('.submenu');
+            const submenuId = menuItem.getAttribute('data-submenu-id');
+            // If no ID, fallback to old way (child lookup) for backward compatibility if needed, 
+            // but we expect IDs now.
+            let submenu = null;
+            if (submenuId) {
+                submenu = document.getElementById(submenuId);
+            } else {
+                submenu = menuItem.querySelector('.submenu');
+            }
+            
             if (!submenu) return;
             
             // Show submenu on hover
@@ -1910,10 +2004,12 @@ export const room = {
                 }
                 
                 // Hide other submenus first
-                this.hideAllSubmenus();
+                if (this.currentSubmenu && this.currentSubmenu !== submenu) {
+                    this.hideAllSubmenus();
+                }
                 
-                // Show this submenu
-                submenu.style.display = 'block';
+                // Position and show this submenu
+                this.positionSubmenu(menuItem, submenu);
                 this.currentSubmenu = submenu;
             });
             
@@ -1949,6 +2045,32 @@ export const room = {
                 this.scheduleSubmenuHide(submenu);
             });
         });
+    },
+
+    positionSubmenu(parentItem, submenu) {
+        submenu.style.display = 'block'; // Show first to measure dimensions
+        
+        const parentRect = parentItem.getBoundingClientRect();
+        const submenuRect = submenu.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        let left = parentRect.right;
+        let top = parentRect.top;
+        
+        // Check right edge - if it doesn't fit on right, try left
+        if (left + submenuRect.width > viewportWidth) {
+            left = parentRect.left - submenuRect.width;
+        }
+        
+        // Check bottom edge
+        if (top + submenuRect.height > viewportHeight) {
+            top = viewportHeight - submenuRect.height - 10; // 10px padding
+            if (top < 0) top = 0;
+        }
+        
+        submenu.style.left = left + 'px';
+        submenu.style.top = top + 'px';
     },
 
     scheduleSubmenuHide(submenu) {
@@ -2096,9 +2218,9 @@ export const room = {
     },
 
     serializeState() {
-        // Capture video current time for HTML boxes
+        // Capture video current time for HTML and ATXT boxes
         room.boxes.forEach(box => {
-            if (box.type === 'html' && box.element) {
+            if ((box.type === 'html' || box.type === 'atxt') && box.element) {
                 const textDiv = box.element.querySelector('.box-text');
                 if (textDiv) {
                     const videos = textDiv.querySelectorAll('video');
@@ -2347,16 +2469,28 @@ export const room = {
         if (this.boxes.length === 0) return;
         
         let currentIndex = -1;
+        let wasMaximized = false;
+
         if (this.selectedBox) {
             currentIndex = this.boxes.indexOf(this.selectedBox);
+            if (this.selectedBox.maximized) {
+                wasMaximized = true;
+                this.selectedBox.maximized = false;
+            }
         }
         
         // Move to next box (wrap around to first if at end)
         const nextIndex = (currentIndex + 1) % this.boxes.length;
         const nextBox = this.boxes[nextIndex];
         
-        // Select the box and center it
+        // Select the box
         this.selectBox(nextBox, false);
+        
+        if (wasMaximized) {
+            nextBox.maximized = true;
+            this.saveState();
+        }
+
         this.centerBoxInViewport(nextBox);
     },
 
@@ -2364,16 +2498,28 @@ export const room = {
         if (this.boxes.length === 0) return;
         
         let currentIndex = -1;
+        let wasMaximized = false;
+
         if (this.selectedBox) {
             currentIndex = this.boxes.indexOf(this.selectedBox);
+            if (this.selectedBox.maximized) {
+                wasMaximized = true;
+                this.selectedBox.maximized = false;
+            }
         }
         
         // Move to previous box (wrap around to last if at beginning)
         const prevIndex = currentIndex <= 0 ? this.boxes.length - 1 : currentIndex - 1;
         const prevBox = this.boxes[prevIndex];
         
-        // Select the box and center it
+        // Select the box
         this.selectBox(prevBox, false);
+        
+        if (wasMaximized) {
+            prevBox.maximized = true;
+            this.saveState();
+        }
+
         this.centerBoxInViewport(prevBox);
     },
 
@@ -2619,16 +2765,14 @@ export const room = {
 
         const menu = document.getElementById('textContextMenu');
         if (menu) {
-            // Show/hide formatting options based on box type
-            const formattingMenu = document.getElementById('textMenuFormatting');
-            if (formattingMenu) {
-                const isAtxt = this.editingBox && this.editingBox.type === 'atxt';
-                formattingMenu.style.display = isAtxt ? 'block' : 'none';
-            }
+      // Show/hide formatting options based on box type
+      const formattingMenu = document.getElementById('textMenuFormatting');
+      if (formattingMenu) {
+        const isAtxt = this.editingBox && this.editingBox.type === 'atxt';
+        formattingMenu.style.display = isAtxt ? 'block' : 'none';
+      }
 
-            menu.style.display = 'block';
-            menu.style.left = x + 'px';
-            menu.style.top = y + 'px';
-        }
+      this.adjustMenuPosition(menu, x, y);
+    }
     }
 };

@@ -10,7 +10,10 @@ export const roomEventHandlers = {
 
         // If we are currently editing this box, allow default double-click behavior (word selection)
         if (room.editingBox && room.editingBox === owner) {
-            return;
+            // If the target is the tag dot, we allow it to proceed to handle maximizing
+            if (!e.target.classList.contains('tag-dot')) {
+                return;
+            }
         }
 
         e.stopPropagation();
@@ -29,10 +32,14 @@ export const roomEventHandlers = {
                 }
                 break;
             case 'box':
-                registerEvent('expandingBox')
-                e.stopPropagation();
-                room.selectBox(owner, false);
-                room.expandBox(owner);
+                if (e.target.classList.contains('tag-dot')) {
+                    room.toggleMaximizeBox(owner);
+                } else {
+                    registerEvent('expandingBox')
+                    e.stopPropagation();
+                    room.selectBox(owner, false);
+                    room.expandBox(owner);
+                }
                 break;
             case 'arrow':
                 // Double-clicking arrow does nothing currently
@@ -104,6 +111,7 @@ export const roomEventHandlers = {
                             room.selectBox(owner, ifAppend);
                         } else {
                             registerEvent('resizingBox')
+                            e.preventDefault();
                             room.triggeringMovement = false;
                             room.selectBox(owner, ifAppend);
                             room.lastMousePos = pos;
@@ -127,6 +135,7 @@ export const roomEventHandlers = {
                 break;
             case 2: // Right click
                 e.preventDefault();
+                e.stopPropagation();
                 const menuPos = { x: e.clientX, y: e.clientY };
 
                 // If editing a box and right-clicked inside it, show text context menu
@@ -188,6 +197,7 @@ export const roomEventHandlers = {
                 room.updateConnectionPreview(pos);
                 break;
             case 'resizingBox':
+                e.preventDefault();
                 const dw = pos.x - room.lastMousePos.x;
                 const dh = pos.y - room.lastMousePos.y;
                 const dir = room.resizeDirection || 'se';
@@ -471,6 +481,11 @@ export const roomEventHandlers = {
     },
 
     handleKeyDown(e) {
+        // Prevent room hotkeys when typing in search input
+        if (e.target.id === 'proj-search-input') {
+            return;
+        }
+
         if (panel && panel.uiVisible) {
             return;
         }

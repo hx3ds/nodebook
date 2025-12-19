@@ -52,9 +52,29 @@ export const explorer = {
         document.addEventListener('click', (e) => {
             const fileMenu = document.getElementById('fileContextMenu');
             if (fileMenu && !fileMenu.contains(e.target)) {
-                fileMenu.style.display = 'none';
+                if (fileMenu.style.display !== 'none') {
+                    fileMenu.style.display = 'none';
+                    // Clear selection when menu is closed
+                    document.querySelectorAll('.tree-item-header.selected').forEach(el => {
+                        el.classList.remove('selected');
+                    });
+                    this.selectedItem = null;
+                }
             }
         });
+        
+        // Sidebar empty space context menu
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) {
+            sidebar.addEventListener('contextmenu', (e) => {
+                // Check if we clicked on a tree item header or its children
+                const treeItem = e.target.closest('.tree-item-header');
+                if (!treeItem) {
+                    e.preventDefault();
+                    this.handleSidebarContextMenu(e);
+                }
+            });
+        }
         
         if (fileMenuOpen) {
             fileMenuOpen.addEventListener('click', () => this.openSelectedFile());
@@ -66,14 +86,31 @@ export const explorer = {
             fileMenuDelete.addEventListener('click', () => this.deleteSelectedFile());
         }
         
+        const fileMenuHideSidebar = document.getElementById('fileMenuHideSidebar');
+        if (fileMenuHideSidebar) {
+            fileMenuHideSidebar.addEventListener('click', () => {
+                if (room && room.toggleSidebar) {
+                    room.toggleSidebar();
+                }
+                document.getElementById('fileContextMenu').style.display = 'none';
+                // Clear selection
+                document.querySelectorAll('.tree-item-header.selected').forEach(el => {
+                    el.classList.remove('selected');
+                });
+                this.selectedItem = null;
+            });
+        }
+        
         // Sidebar resizer
         this.setupSidebarResizer();
         
         // Load sidebar collapsed state
         const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
         if (isCollapsed) {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.add('collapsed');
+            const sidebarContainer = document.getElementById('sidebarContainer');
+            if (sidebarContainer) {
+                sidebarContainer.classList.add('collapsed');
+            }
         }
         
         // Load last opened folder
@@ -103,15 +140,15 @@ export const explorer = {
     },
     
     setupSidebarResizer() {
-        const sidebar = document.getElementById('sidebar');
-        const handle = document.getElementById('sidebarResizeHandle');
+        const sidebarContainer = document.getElementById('sidebarContainer');
+        const handle = document.getElementById('sidebarResizer');
         
-        if (!sidebar || !handle) return;
+        if (!sidebarContainer || !handle) return;
         
         // Restore width
         const savedWidth = localStorage.getItem('sidebarWidth');
         if (savedWidth) {
-            sidebar.style.width = savedWidth + 'px';
+            document.documentElement.style.setProperty('--sidebar-width', savedWidth + 'px');
         }
         
         let isResizing = false;
@@ -119,25 +156,29 @@ export const explorer = {
         handle.addEventListener('mousedown', (e) => {
             isResizing = true;
             document.body.style.cursor = 'ew-resize';
+            document.body.style.userSelect = 'none';
             e.preventDefault();
         });
         
         document.addEventListener('mousemove', (e) => {
             if (!isResizing) return;
             
-            const newWidth = e.clientX;
+            let newWidth = e.clientX;
             
             // Constraints
-            if (newWidth >= 200 && newWidth <= 500) {
-                sidebar.style.width = newWidth + 'px';
-            }
+            if (newWidth < 200) newWidth = 200;
+            if (newWidth > 500) newWidth = 500;
+            
+            document.documentElement.style.setProperty('--sidebar-width', newWidth + 'px');
         });
         
         document.addEventListener('mouseup', () => {
             if (isResizing) {
                 isResizing = false;
                 document.body.style.cursor = '';
-                localStorage.setItem('sidebarWidth', parseInt(sidebar.style.width));
+                document.body.style.userSelect = '';
+                const width = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width');
+                localStorage.setItem('sidebarWidth', parseInt(width));
             }
         });
     },
@@ -353,9 +394,46 @@ export const explorer = {
         this.selectedItem = item;
         
         const menu = document.getElementById('fileContextMenu');
-        menu.style.display = 'block';
-        menu.style.left = e.clientX + 'px';
-        menu.style.top = e.clientY + 'px';
+        
+        // Show file-specific buttons
+        document.getElementById('fileMenuOpen').style.display = 'flex';
+        document.getElementById('fileMenuRename').style.display = 'flex';
+        document.getElementById('fileMenuDelete').style.display = 'flex';
+        const divider = menu.querySelector('.menu-divider');
+        if (divider) divider.style.display = 'block';
+        
+        if (room && room.adjustMenuPosition) {
+            room.adjustMenuPosition(menu, e.clientX, e.clientY);
+        } else {
+            menu.style.display = 'block';
+            menu.style.left = e.clientX + 'px';
+            menu.style.top = e.clientY + 'px';
+        }
+    },
+    
+    handleSidebarContextMenu(e) {
+        // Deselect any selected items
+        document.querySelectorAll('.tree-item-header.selected').forEach(el => {
+            el.classList.remove('selected');
+        });
+        this.selectedItem = null;
+        
+        const menu = document.getElementById('fileContextMenu');
+        
+        // Hide file-specific buttons
+        document.getElementById('fileMenuOpen').style.display = 'none';
+        document.getElementById('fileMenuRename').style.display = 'none';
+        document.getElementById('fileMenuDelete').style.display = 'none';
+        const divider = menu.querySelector('.menu-divider');
+        if (divider) divider.style.display = 'none';
+        
+        if (room && room.adjustMenuPosition) {
+            room.adjustMenuPosition(menu, e.clientX, e.clientY);
+        } else {
+            menu.style.display = 'block';
+            menu.style.left = e.clientX + 'px';
+            menu.style.top = e.clientY + 'px';
+        }
     },
     
     async openFile(filePath) {
@@ -499,6 +577,11 @@ export const explorer = {
         
         if (!newName || newName === oldName) {
             document.getElementById('fileContextMenu').style.display = 'none';
+            // Clear selection
+            document.querySelectorAll('.tree-item-header.selected').forEach(el => {
+                el.classList.remove('selected');
+            });
+            this.selectedItem = null;
             return;
         }
         
@@ -533,6 +616,11 @@ export const explorer = {
         const confirmed = await dialog.confirm(confirmMsg, 'Delete');
         if (!confirmed) {
             document.getElementById('fileContextMenu').style.display = 'none';
+            // Clear selection
+            document.querySelectorAll('.tree-item-header.selected').forEach(el => {
+                el.classList.remove('selected');
+            });
+            this.selectedItem = null;
             return;
         }
         

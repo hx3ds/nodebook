@@ -1,7 +1,7 @@
 #controls-layer {
     position: fixed;
-    top: 16px;
-    right: 16px;
+    top: 6px;
+    right: 6px;
     width: auto;
     height: auto;
     z-index: 60;
@@ -62,17 +62,21 @@
 }
 
 .controls-bar {
-    background: #fff;
-    border: 1px solid #e1e4e8;
-    border-radius: 6px;
-    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 24px;
+    padding: 4px 12px;
     display: flex;
     align-items: center;
     gap: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
     max-width: calc(100vw - 48px);
     overflow-x: auto;
     scrollbar-width: none;
+    height: 38px;
+    box-sizing: border-box;
 }
 
 .controls-bar::-webkit-scrollbar {
@@ -104,20 +108,46 @@
     border-color: rgba(27, 31, 35, 0.15);
 }
 
-.seek-bar-container, .volume-bar-container, .bg-bar-container {
-    background: #fff;
-    border: 1px solid #e1e4e8;
-    border-radius: 6px;
-    padding: 8px 12px;
+.seek-bar-container, .volume-bar-container, .bg-bar-container, .search-bar-container {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+    padding: 4px 12px;
     display: flex;
     align-items: center;
     gap: 8px;
     transition: all 0.3s;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    height: 28px;
+    box-sizing: border-box;
 }
 
-.seek-bar-container, .volume-bar-container {
+.seek-bar-container, .volume-bar-container, .search-bar-container {
     width: 256px;
+}
+
+.search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 13px;
+    color: #24292e;
+    background: transparent;
+    min-width: 0; /* Allow flex item to shrink below content size */
+}
+
+.search-input::placeholder {
+    color: #6a737d;
+}
+
+.search-results-count {
+    font-size: 11px;
+    color: #6a737d;
+    white-space: nowrap;
+    margin-left: 8px;
+    font-variant-numeric: tabular-nums;
 }
 
 .bg-bar-container {
@@ -170,24 +200,26 @@
 
 /* Playlist Styles */
 .playlist-container {
-    background: #fff;
-    border: 1px solid #e1e4e8;
-    border-radius: 6px;
-    width: 280px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    width: 256px;
     max-height: 400px;
     display: flex;
     flex-direction: column;
     margin: 0;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
     padding: 0;
     pointer-events: auto;
     overflow: hidden;
 }
 
 .playlist-header {
-    padding: 12px 16px;
-    border-bottom: 1px solid #e1e4e8;
-    background-color: #f6f8fa;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    background-color: transparent;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -195,7 +227,7 @@
 }
 
 .playlist-title {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: #24292e;
     text-transform: none;
@@ -204,9 +236,9 @@
 
 .playlist-count {
     color: #586069;
-    font-size: 12px;
+    font-size: 11px;
     background: rgba(27, 31, 35, 0.08);
-    padding: 2px 6px;
+    padding: 1px 6px;
     border-radius: 10px;
 }
 
@@ -231,13 +263,13 @@
 }
 
 .playlist-item {
-    padding: 10px 16px;
+    padding: 6px 12px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     cursor: pointer;
     transition: background-color 0.15s ease;
-    border-bottom: 1px solid #eaecef;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
     border-radius: 0;
     background: transparent;
 }
@@ -272,7 +304,7 @@
 }
 
 .playlist-item-name {
-    font-size: 13px;
+    font-size: 12px;
     color: #24292e;
     white-space: nowrap;
     overflow: hidden;
@@ -287,10 +319,10 @@
 }
 
 .playlist-item-type {
-    font-size: 11px;
+    font-size: 10px;
     color: #586069;
     text-transform: none;
-    margin-top: 2px;
+    margin-top: 1px;
 }
 
 .playlist-item.active .playlist-item-type {

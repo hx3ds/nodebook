@@ -9,7 +9,13 @@ export const control = {
     showVolume: false,
     showBg: false,
     showScale: false,
+    showSearch: false,
     
+    // Search State
+    searchResults: [],
+    currentResultIndex: -1,
+    searchQuery: '',
+
     // Interaction State
     isDragging: false,
     dragStart: { x: 0, y: 0 },
@@ -26,8 +32,8 @@ export const control = {
     init() {
         this.element = document.getElementById('controls-layer');
         // Initialize position
-        this.element.style.top = '16px';
-        this.element.style.right = '16px';
+        this.element.style.top = '6px';
+        this.element.style.right = '6px';
         this.element.style.bottom = 'auto';
         this.element.style.left = 'auto';
         
@@ -60,6 +66,9 @@ export const control = {
         document.getElementById('proj-scale-toggle').addEventListener('click', handlers.handleScaleToggle);
         document.getElementById('proj-room-toggle').addEventListener('click', handlers.handleRoomToggle);
         document.getElementById('proj-panel-toggle').addEventListener('click', handlers.handlePanelToggle);
+        document.getElementById('proj-search-toggle').addEventListener('click', handlers.handleSearchToggle);
+        document.getElementById('proj-search-input').addEventListener('input', handlers.handleSearchInput);
+        document.getElementById('proj-search-input').addEventListener('keydown', handlers.handleSearchKeyDown);
         
         // Seek Input
         document.getElementById('proj-seek-input').addEventListener('input', handlers.handleSeekInput);
@@ -99,6 +108,7 @@ export const control = {
 
         window.addEventListener('mousemove', handlers.handleMouseMove);
         window.addEventListener('mouseup', handlers.handleMouseUp);
+        window.addEventListener('keydown', handlers.handleGlobalKeyDown);
     },
     
     update() {
@@ -202,6 +212,23 @@ export const control = {
             // Actually, we shouldn't overwrite if user is dragging, but here update() is called on init or state change.
             // Let's rely on event handler to update UI value during drag.
         }
+
+        const searchBar = document.getElementById('proj-search-bar');
+        const searchToggle = document.getElementById('proj-search-toggle');
+        if (searchBar) {
+            if (this.showSearch) {
+                searchBar.classList.remove('hidden');
+                if (searchToggle) searchToggle.classList.add('active');
+                // Focus input when shown
+                const input = document.getElementById('proj-search-input');
+                if (input && document.activeElement !== input) {
+                    setTimeout(() => input.focus(), 50);
+                }
+            } else {
+                searchBar.classList.add('hidden');
+                if (searchToggle) searchToggle.classList.remove('active');
+            }
+        }
         if (scaleValue && projection.scale !== undefined) {
             scaleValue.textContent = Math.round(projection.scale * 100) + '%';
         }
@@ -235,8 +262,8 @@ export const control = {
     
     resetPosition() {
         if (this.element) {
-            this.element.style.top = '16px';
-            this.element.style.right = '16px';
+            this.element.style.top = '6px';
+            this.element.style.right = '6px';
             this.element.style.bottom = 'auto';
             this.element.style.left = 'auto';
             this.element.style.transform = 'none';
