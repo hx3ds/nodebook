@@ -328,7 +328,7 @@ export const room = {
                 const currentTag = { color, name };
                 
                 // Show custom tag dialog for editing
-                const result = await room.showCustomTagDialog(currentTag, false);
+                const result = await room.showCustomTagDialog(currentTag, true);
                 
                 if (result === 'remove') {
                     // Remove from tagNames dictionary
@@ -526,7 +526,10 @@ export const room = {
     setArrowTag(arrow, color) {
         if (!arrow) return;
         if (color === null) {
-            arrow.tag = null;
+            arrow.tag = {
+                color: '#5f6368',
+                name: 'Default'
+            };
         } else {
             const existingTag = arrow.tag;
             const defaultName = this.tagNames[color] || '';
@@ -545,7 +548,7 @@ export const room = {
         if (!box) return;
         this.hideContextMenu();
         
-        const result = await this.showCustomTagDialog(box.tag);
+        const result = await this.showCustomTagDialog();
         if (result) {
             // Add to tagNames dictionary for future use
             this.tagNames[result.color] = result.name;
@@ -565,7 +568,7 @@ export const room = {
         if (!arrow) return;
         this.hideContextMenu();
         
-        const result = await this.showCustomTagDialog(arrow.tag);
+        const result = await this.showCustomTagDialog(arrow.tag, false, '#5f6368');
         if (result) {
             // Add to tagNames dictionary for future use
             this.tagNames[result.color] = result.name;
@@ -581,7 +584,7 @@ export const room = {
         }
     },
 
-    showCustomTagDialog(existingTag, showRemoveButton = false) {
+    showCustomTagDialog(existingTag, showRemoveButton = false, defaultColor = '#3b82f6') {
         return new Promise((resolve) => {
             const dialog = document.getElementById('customTagDialog');
             const overlay = document.getElementById('customTagDialogOverlay');
@@ -595,12 +598,12 @@ export const room = {
             // Set initial values
             if (existingTag) {
                 nameInput.value = existingTag.name || '';
-                colorPicker.value = existingTag.color || '#3b82f6';
-                colorInput.value = existingTag.color || '#3b82f6';
+                colorPicker.value = existingTag.color || defaultColor;
+                colorInput.value = existingTag.color || defaultColor;
             } else {
                 nameInput.value = '';
-                colorPicker.value = '#3b82f6';
-                colorInput.value = '#3b82f6';
+                colorPicker.value = defaultColor;
+                colorInput.value = defaultColor;
             }
 
             // Show or hide the remove button

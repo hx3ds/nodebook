@@ -121,6 +121,7 @@ export const roomEventHandlers = {
                         break;
                     case 'arrow':
                         registerEvent('selectingArrow')
+                        room.resetSelection();
                         const arrow = room.findArrowAt(pos);
                         room.selectedArrow = arrow;
                         room.highlightArrow(arrow, true);
@@ -490,6 +491,14 @@ export const roomEventHandlers = {
             return;
         }
 
+        // Escape to deselect
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            room.finishEditing();
+            room.resetSelection();
+            return;
+        }
+
         if (room.editingBox) {
             return;
         }
@@ -560,20 +569,6 @@ export const roomEventHandlers = {
             return;
         }
 
-        // Escape to deselect
-        if (e.key === 'Escape') {
-            const prevBox = room.selectedBox;
-            const prevArrow = room.selectedArrow;
-
-            room.selectedBox = null;
-            room.selectedArrow = null;
-            room.element.style.cursor = 'default';
-
-            // Update selection states
-            if (prevBox) room.highlightBox(prevBox, false);
-            if (prevArrow) room.highlightArrow(prevArrow, false);
-            return;
-        }
     }
 };
 
