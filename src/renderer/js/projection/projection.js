@@ -11,14 +11,14 @@ export const projection = {
     volume: 1.0,
     loopMode: 'list', // 'single', 'list'
     
-    // UI Logic is now in control
-    // But we keep track of bg color for projection rendering
+    // UI state (logic moved to control.js)
+    // Persist background color for rendering
     bgColor: '#FFFDD0',
     scale: 1.0,
     panX: 0,
     panY: 0,
 
-    // Interaction State
+    // Interaction state for pan/zoom
     isDragging: false,
     dragStart: { x: 0, y: 0 },
     initialPan: { x: 0, y: 0 },
@@ -36,18 +36,18 @@ export const projection = {
         this.setupEventListeners();
         this.restoreState();
         
-        // Auto-save state every 5 seconds if playing
+        // Auto-save playback state periodically
         setInterval(() => {
             if (this.isPlaying && (this.videoElement || this.audioElement)) {
                 this.saveState();
             }
         }, 5000);
         
-        // control is initialized by main.js
+        // Note: control module is initialized externally
     },
 
     setupEventListeners() {
-        // We attach mousedown to the specific element, but mousemove/up to window to handle dragging outside
+        // Attach drag events to window for smooth off-canvas handling
         this.element.addEventListener('mousedown', handlers.handleMouseDown);
         window.addEventListener('mousemove', handlers.handleMouseMove);
         window.addEventListener('mouseup', handlers.handleMouseUp);
@@ -114,7 +114,7 @@ export const projection = {
         });
         
         if (validFiles.length > 0) {
-            // Revoke old
+            // Revoke previous object URLs to prevent memory leaks
             this.playlist.forEach(item => URL.revokeObjectURL(item.url));
             
             this.playlist = validFiles.map(file => {
@@ -178,7 +178,7 @@ export const projection = {
                         return {
                             name: name,
                             type: type,
-                            url: 'file://' + path.replace(/\\/g, '/'), // Ensure forward slashes for URL
+                            url: 'file://' + path.replace(/\\/g, '/'), // Normalize path separators
                             path: path
                         };
                     });
@@ -224,7 +224,7 @@ export const projection = {
                     }
                 }
             } else {
-                // Image or Document
+                // Toggle state for static media
                 this.isPlaying = !this.isPlaying;
             }
         }
@@ -343,7 +343,7 @@ export const projection = {
     },
     
     updateProjection() {
-        // Clear content
+        // Reset projection container
         this.projectionContent.innerHTML = '';
         this.updateTransform();
         this.videoElement = null;
@@ -351,7 +351,7 @@ export const projection = {
         
         const media = this.getCurrentMedia();
         
-        // Void Background
+        // Render void background for audio/empty state
         if (!media || media.type.startsWith('audio/')) {
             if (this.bgColor === '#000000' || this.bgColor === '#1A1B1D') {
                 const voidBg = document.createElement('div');

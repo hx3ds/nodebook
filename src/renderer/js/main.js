@@ -5,6 +5,8 @@ import { projection } from './projection/projection.js';
 import { panel } from './panel/panel.js';
 import { control } from './control/control.js';
 
+explorer.room = room;
+
 window.room = room;
 window.explorer = explorer;
 window.projection = projection;

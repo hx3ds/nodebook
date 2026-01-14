@@ -1,4 +1,6 @@
 import { roomEventHandlers as handlers } from './roomEventHandlers.js';
+import { explorer } from '../explorer/explorer.js';
+import { mesh } from '../explorer/mesh.js';
 
 export const room = {
     event: null,
@@ -32,6 +34,8 @@ export const room = {
     selectionStart: null,
     selectionRect: null,
     lastPanPos: { x: 0, y: 0 },
+
+    userId: null, // Initialized in init()
     
     // Double click detection
     lastClickTime: 0,
@@ -53,23 +57,516 @@ export const room = {
     history: [],
     historyIndex: -1,
     maxHistorySize: 50,
-    
+    maxCachedRooms: 30,
+
+    _activeRoomKey: null,
+    _roomContexts: null,
+    _pruneInProgress: false,
+
     // Submenu hover state
     submenuTimeout: null,
     currentSubmenu: null,
     submenuHideDelay: 300, // milliseconds
 
+    getActiveRoomKey() {
+        return explorer.currentFilePath || '__default__';
+    },
+
+    _getRoomStorageKey(baseKey, roomKey = this.getActiveRoomKey()) {
+        return `${baseKey}:${encodeURIComponent(roomKey)}`;
+    },
+
+    _safeSetItem(key, value) {
+        try {
+            localStorage.setItem(key, value);
+            return true;
+        } catch {
+            this._pruneRoomStorage(10);
+            try {
+                localStorage.setItem(key, value);
+                return true;
+            } catch {
+                return false;
+            }
+        }
+    },
+
+    _readRoomIndex() {
+        const raw = localStorage.getItem('nodeRoomIndex');
+        if (!raw) return [];
+        try {
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    },
+
+    _writeRoomIndex(index) {
+        this._safeSetItem('nodeRoomIndex', JSON.stringify(index));
+    },
+
+    _touchRoomKey(roomKey) {
+        const index = this._readRoomIndex().filter(e => e && e.k && e.k !== roomKey);
+        index.push({ k: roomKey, t: Date.now() });
+        this._writeRoomIndex(index);
+        this._pruneRoomStorage();
+    },
+
+    _pruneRoomStorage(extraToPrune = 0) {
+        if (this._pruneInProgress) return;
+        this._pruneInProgress = true;
+        try {
+            const max = Math.max(0, this.maxCachedRooms);
+            const index = this._readRoomIndex().filter(e => e && typeof e.k === 'string');
+            const targetLen = Math.max(0, max - Math.max(0, extraToPrune));
+            if (index.length <= targetLen) {
+                this._writeRoomIndex(index);
+                return;
+            }
+            const toRemove = index.slice(0, index.length - targetLen);
+            const remaining = index.slice(index.length - targetLen);
+            for (const entry of toRemove) {
+                const k = entry.k;
+                localStorage.removeItem(this._getRoomStorageKey('nodeState', k));
+                localStorage.removeItem(this._getRoomStorageKey('nodeLocalState', k));
+                localStorage.removeItem(this._getRoomStorageKey('nodeHistory', k));
+                localStorage.removeItem(this._getRoomStorageKey('nodeSavedFp', k));
+            }
+            this._writeRoomIndex(remaining);
+        } finally {
+            this._pruneInProgress = false;
+        }
+    },
+
+    _hashStringFNV1a(str) {
+        let h = 2166136261;
+        for (let i = 0; i < str.length; i++) {
+            h ^= str.charCodeAt(i);
+            h = Math.imul(h, 16777619);
+        }
+        return h >>> 0;
+    },
+
+    _fingerprintState(state) {
+        if (!state || !Array.isArray(state.boxes) || !Array.isArray(state.arrows)) {
+            return '0';
+        }
+        let h = 2166136261;
+        const add = (v) => {
+            const s = v === null || v === undefined ? '' : String(v);
+            for (let i = 0; i < s.length; i++) {
+                h ^= s.charCodeAt(i);
+                h = Math.imul(h, 16777619);
+            }
+            h ^= 124;
+            h = Math.imul(h, 16777619);
+        };
+
+        const boxes = state.boxes.slice().sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        add('boxes');
+        for (const b of boxes) {
+            add('b');
+            add(b.id);
+            add(b.x); add(b.y); add(b.width); add(b.height);
+            add(b.defaultWidth); add(b.defaultHeight);
+            add(b.text);
+            add(b.expanded ? 1 : 0);
+            add(b.type);
+            add(b.linkedNotePath);
+            add(b.scrollOffset);
+            add(b.tag && b.tag.color);
+            add(b.tag && b.tag.name);
+            add(b.acquired);
+        }
+
+        const arrows = state.arrows.slice().sort((a, b) => {
+            const ak = `${a.sourceId}>${a.targetId}>${a.tag?.color || ''}>${a.tag?.name || ''}`;
+            const bk = `${b.sourceId}>${b.targetId}>${b.tag?.color || ''}>${b.tag?.name || ''}`;
+            return ak.localeCompare(bk);
+        });
+        add('arrows');
+        for (const a of arrows) {
+            add('a');
+            add(a.sourceId);
+            add(a.targetId);
+            add(a.tag && a.tag.color);
+            add(a.tag && a.tag.name);
+            add(a.acquired);
+        }
+
+        return (h >>> 0).toString(16);
+    },
+
+    _getRoomContext(roomKey = this.getActiveRoomKey()) {
+        if (!this._roomContexts) {
+            this._roomContexts = Object.create(null);
+        }
+        if (!this._roomContexts[roomKey]) {
+            const ctx = { history: [], historyIndex: -1 };
+            const raw = localStorage.getItem(this._getRoomStorageKey('nodeHistory', roomKey));
+            if (raw) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && Array.isArray(parsed.history)) {
+                        ctx.history = parsed.history.slice(-this.maxHistorySize);
+                        if (Number.isInteger(parsed.historyIndex)) {
+                            const trimmedBy = Math.max(0, parsed.history.length - ctx.history.length);
+                            ctx.historyIndex = Math.max(-1, parsed.historyIndex - trimmedBy);
+                        }
+                        if (ctx.historyIndex < 0 && ctx.history.length > 0) {
+                            ctx.historyIndex = ctx.history.length - 1;
+                        }
+                        if (ctx.historyIndex > ctx.history.length - 1) {
+                            ctx.historyIndex = ctx.history.length - 1;
+                        }
+                    }
+                } catch {
+                    ctx.history = [];
+                    ctx.historyIndex = -1;
+                }
+            }
+            this._roomContexts[roomKey] = ctx;
+        }
+        return this._roomContexts[roomKey];
+    },
+
+    _persistRoomHistory(roomKey) {
+        const ctx = this._getRoomContext(roomKey);
+        const historyIndex = Number.isInteger(ctx.historyIndex) ? ctx.historyIndex : -1;
+        if (ctx.history.length > this.maxHistorySize) {
+            const trimmed = ctx.history.slice(-this.maxHistorySize);
+            const trimmedBy = ctx.history.length - trimmed.length;
+            ctx.history = trimmed;
+            ctx.historyIndex = Math.max(-1, historyIndex - trimmedBy);
+        }
+        this._safeSetItem(
+            this._getRoomStorageKey('nodeHistory', roomKey),
+            JSON.stringify({ history: ctx.history, historyIndex })
+        );
+        this._touchRoomKey(roomKey);
+    },
+
+    _syncActiveRoomContext() {
+        const nextKey = this.getActiveRoomKey();
+        if (this._activeRoomKey === nextKey) {
+            return false;
+        }
+        this._activeRoomKey = nextKey;
+
+        const localState = localStorage.getItem(this._getRoomStorageKey('nodeLocalState', nextKey));
+        if (localState) {
+            try {
+                const parsed = JSON.parse(localState);
+                if (parsed && parsed.offset) {
+                    this.offset = parsed.offset;
+                }
+            } catch (e) {
+                console.error('Failed to load local state', e);
+            }
+        } else {
+            this.offset = { x: 0, y: 0 };
+        }
+
+        this._getRoomContext(nextKey);
+        this._touchRoomKey(nextKey);
+        return true;
+    },
+
+    _ensureHistoryBaseline(loadedState) {
+        const roomKey = this._activeRoomKey || this.getActiveRoomKey();
+        const ctx = this._getRoomContext(roomKey);
+        const baseline = loadedState || this.serializeState();
+        const baselineFp = this._fingerprintState(baseline);
+
+        if (ctx.history.length === 0) {
+            ctx.history = [baseline];
+            ctx.historyIndex = 0;
+            this._persistRoomHistory(roomKey);
+            return;
+        }
+
+        let matchIndex = -1;
+        for (let i = 0; i < ctx.history.length; i++) {
+            if (this._fingerprintState(ctx.history[i]) === baselineFp) {
+                matchIndex = i;
+                break;
+            }
+        }
+
+        if (matchIndex >= 0) {
+            ctx.historyIndex = matchIndex;
+            this._persistRoomHistory(roomKey);
+            return;
+        }
+
+        ctx.history = [baseline];
+        ctx.historyIndex = 0;
+        this._persistRoomHistory(roomKey);
+    },
+
+    noteFileSaved(filePath, savedState) {
+        if (!filePath) return;
+        const fp = this._fingerprintState(savedState || this.serializeState());
+        this._safeSetItem(this._getRoomStorageKey('nodeSavedFp', filePath), fp);
+        this._touchRoomKey(filePath);
+    },
+
+    updateUserId() {
+        // 1. Try to get authenticated user name
+        const savedUser = localStorage.getItem('user');
+        if (savedUser) {
+            try {
+                const u = JSON.parse(savedUser);
+                if (u.name) {
+                    this.userId = u.name;
+                    return;
+                }
+            } catch (e) {
+                console.error('Error parsing user data:', e);
+            }
+        }
+
+        // 2. Fallback to nodeUserId (persistent device ID)
+        let nodeId = localStorage.getItem('nodeUserId');
+        if (!nodeId) {
+            nodeId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('nodeUserId', nodeId);
+        }
+        this.userId = nodeId;
+    },
+
     init() {
+        this.updateUserId();
+
         this.element = document.getElementById('room');
         this.arrowSpaceElement = document.getElementById('arrowSpace');
         this.loadTagNames();
         this.setupEventListeners();
         this.setupSubmenuHandlers();
+        this._syncActiveRoomContext();
+
         this.pushHistory(); // Initial state
         
         // Apply initial visibility
         if (this.element) {
             this.element.style.display = this.visible ? 'block' : 'none';
+        }
+
+        this.ensureWebSocketForCurrentFile();
+    },
+
+    ws: null,
+    wsReconnectTimer: null,
+    wsReconnectDelay: 2000,
+    wsReconnectMaxDelay: 30000,
+
+    ensureWebSocketForCurrentFile() {
+        if (explorer.currentFilePath && mesh.isMeshPath(explorer.currentFilePath)) {
+            this.connectWebSocket();
+        } else {
+            this.stopWebSocket();
+        }
+    },
+
+    stopWebSocket() {
+        if (this.wsReconnectTimer) {
+            clearTimeout(this.wsReconnectTimer);
+            this.wsReconnectTimer = null;
+        }
+        this.wsReconnectDelay = 2000;
+        if (this.ws) {
+            try {
+                this.ws.onopen = null;
+                this.ws.onmessage = null;
+                this.ws.onclose = null;
+                this.ws.onerror = null;
+                this.ws.close();
+            } catch {
+            }
+            this.ws = null;
+        }
+    },
+
+    _scheduleReconnect() {
+        if (this.wsReconnectTimer) return;
+        if (!explorer.currentFilePath || !mesh.isMeshPath(explorer.currentFilePath)) return;
+        const delay = Math.min(this.wsReconnectDelay, this.wsReconnectMaxDelay);
+        this.wsReconnectTimer = setTimeout(() => {
+            this.wsReconnectTimer = null;
+            this.connectWebSocket();
+        }, delay);
+        this.wsReconnectDelay = Math.min(this.wsReconnectDelay * 2, this.wsReconnectMaxDelay);
+    },
+
+    connectWebSocket() {
+        if (!explorer.currentFilePath || !mesh.isMeshPath(explorer.currentFilePath)) {
+            return;
+        }
+        if (this.ws) {
+            if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+                return;
+            }
+            try {
+                this.ws.close();
+            } catch {
+            }
+        }
+
+        this.ws = new WebSocket(mesh.WS_URL);
+
+        this.ws.onopen = () => {
+            console.log('WebSocket connected');
+            this.wsReconnectDelay = 2000;
+            if (this.wsReconnectTimer) {
+                clearTimeout(this.wsReconnectTimer);
+                this.wsReconnectTimer = null;
+            }
+            this.fetchInitialLocks();
+        };
+
+        this.ws.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                this.handleLockMessage(msg);
+            } catch (e) {
+                console.error('WebSocket message parse error', e);
+            }
+        };
+
+        this.ws.onclose = () => {
+            console.log('WebSocket disconnected, retrying in 2s...');
+            this._scheduleReconnect();
+        };
+
+        this.ws.onerror = (err) => {
+            console.error('WebSocket error', err);
+            try {
+                this.ws.close();
+            } catch {
+            }
+        };
+    },
+
+    async releaseAllLocksForPath(filePath) {
+        if (!filePath || !mesh.isMeshPath(filePath)) return;
+        if (!this.userId) {
+            this.updateUserId();
+        }
+
+        const ownedIds = [];
+        this.boxes.forEach(box => {
+            if (box && box.acquired === this.userId && box.id) ownedIds.push(box.id);
+        });
+        this.getAllArrows().forEach(arrow => {
+            if (arrow && arrow.acquired === this.userId && arrow.id) ownedIds.push(arrow.id);
+        });
+
+        if (ownedIds.length === 0) return;
+
+        for (const id of ownedIds) {
+            try {
+                await mesh.releaseLock(filePath, id, this.userId);
+            } catch {
+            }
+        }
+
+        this.boxes.forEach(box => {
+            if (box && box.acquired === this.userId) {
+                box.acquired = null;
+                this.drawBox(box, false, false);
+            }
+        });
+        this.getAllArrows().forEach(arrow => {
+            if (arrow && arrow.acquired === this.userId) {
+                arrow.acquired = null;
+                this.drawArrow(arrow);
+            }
+        });
+    },
+
+    async fetchInitialLocks() {
+        if (!explorer.currentFilePath || !mesh.isMeshPath(explorer.currentFilePath)) return;
+        
+        try {
+            const locks = await mesh.fetchLocks(explorer.currentFilePath);
+            
+            // Apply initial locks from server (Source of Truth)
+            const activeLockItemIds = new Set();
+
+            for (const [key, lockInfo] of Object.entries(locks)) {
+                if (!key.includes('#')) continue;
+                this.applyLock(lockInfo);
+                activeLockItemIds.add(lockInfo.itemId);
+            }
+            
+            // Sync local state with server state
+            this.boxes.forEach(box => {
+                if (box.acquired && !activeLockItemIds.has(String(box.id))) {
+                    box.acquired = null;
+                    room.drawBox(box, false, false);
+                }
+            });
+            
+            this.getAllArrows().forEach(arrow => {
+                if (arrow.acquired && !activeLockItemIds.has(String(arrow.id))) {
+                    arrow.acquired = null;
+                    room.drawArrow(arrow);
+                }
+            });
+
+        } catch (e) {
+            console.error('Fetch locks failed', e);
+        }
+    },
+
+    handleLockMessage(msg) {
+        if (!explorer.currentFilePath || !mesh.isMeshPath(explorer.currentFilePath)) return;
+        const currentPath = mesh.getSubPath(explorer.currentFilePath);
+        
+        if (msg.type === 'acquired') {
+            if (msg.lock.path === currentPath) {
+                this.applyLock(msg.lock);
+            }
+        } else if (msg.type === 'released') {
+            if (msg.path === currentPath) {
+                this.removeLock(msg.itemId, msg.clientId);
+            }
+        }
+    },
+
+    applyLock(lockInfo) {
+        const itemId = lockInfo.itemId;
+        const acquiredBy = lockInfo.clientId;
+        
+        const box = this.boxes.find(b => String(b.id) === itemId);
+        if (box) {
+            box.acquired = acquiredBy;
+            room.drawBox(box, false, false);
+        } else {
+            const arrow = room.getAllArrows().find(a => String(a.id) === itemId);
+            if (arrow) {
+                arrow.acquired = acquiredBy;
+                room.drawArrow(arrow);
+            }
+        }
+    },
+
+    removeLock(itemId, clientId) {
+        const box = this.boxes.find(b => String(b.id) === itemId);
+        if (box) {
+            if (box.acquired === clientId) {
+                box.acquired = null;
+                room.drawBox(box, false, false);
+            }
+        } else {
+            const arrow = room.getAllArrows().find(a => String(a.id) === itemId);
+            if (arrow) {
+                if (arrow.acquired === clientId) {
+                    arrow.acquired = null;
+                    room.drawArrow(arrow);
+                }
+            }
         }
     },
 
@@ -138,7 +635,8 @@ export const room = {
             type: 'text',
             linkedNotePath: null,
             scrollOffset: 0,
-            arrows: []
+            arrows: [],
+            acquired: null
         };
         this.boxes.push(box);
         room.drawBox(box, true);
@@ -159,7 +657,7 @@ export const room = {
     },
 
     createArrow(source, target) {
-        const arrow = { source, target, tag: null };
+        const arrow = { source, target, tag: null, acquired: null };
         source.arrows.push(arrow);
         room.drawArrow(arrow);
         room.pushHistory();
@@ -745,13 +1243,46 @@ export const room = {
         }
     },
 
-    selectBox(box, ifAppend = false) {
+    async selectBox(box, ifAppend = false) {
+        if (!box) return;
+
+        // Prevent re-selection of the same box to avoid DOM manipulation that causes blur/edit-mode-exit
+        if (!ifAppend && room.selectedBox === box && room.selectedBoxes.length === 1) {
+            return;
+        }
+
+        const releaseItems = [];
+        if (!ifAppend) {
+            if (room.selectedBox) releaseItems.push(room.selectedBox);
+            room.selectedBoxes.forEach(b => {
+                if (!releaseItems.includes(b)) releaseItems.push(b);
+            });
+            if (room.selectedArrow) releaseItems.push(room.selectedArrow);
+
+            room.resetSelection(true, false);
+        }
+
+        // Check/Acquire Lock from server
+        if (explorer.currentFilePath && mesh.isMeshPath(explorer.currentFilePath)) {
+            if (box.acquired !== room.userId || releaseItems.length > 0) {
+                const result = await explorer.acquireLock(box, releaseItems);
+                if (!result.success) {
+                    box.acquired = result.acquiredBy;
+                    room.highlightBox(box, false);
+                    return;
+                } else {
+                    box.acquired = room.userId;
+                }
+            }
+        }
+
         // Z-order: move to end of array and DOM
         const index = room.boxes.indexOf(box);
         if (index > -1) {
             room.boxes.splice(index, 1);
             room.boxes.push(box);
         }
+
         if (box.element && box.element.parentNode) {
             // append child will rerender the element, store scroll position to restore it after rerendered
             const scrollTop = box.element.scrollTop;
@@ -772,14 +1303,52 @@ export const room = {
                 textContainer.scrollLeft = textScrollLeft;
             }
         }
-        if (!ifAppend) {
-            room.resetSelection();
-        }
+
         room.selectedBox = box;
         if (!room.selectedBoxes.includes(box)) {
             room.selectedBoxes.push(box);
         }
         room.highlightBox(box, true);
+        
+        if (room.event !== 'selectingRoom' && room.event !== 'panning') {
+            room.saveState();
+        }
+    },
+
+    async selectArrow(arrow, ifAppend = false) {
+        if (!arrow) return;
+        
+        const releaseItems = [];
+        if (!ifAppend) {
+            if (room.selectedBox) releaseItems.push(room.selectedBox);
+            room.selectedBoxes.forEach(b => {
+                if (!releaseItems.includes(b)) releaseItems.push(b);
+            });
+            if (room.selectedArrow) releaseItems.push(room.selectedArrow);
+
+            room.resetSelection(true, false);
+        }
+
+        // Check/Acquire Lock from server
+        if (explorer.currentFilePath && mesh.isMeshPath(explorer.currentFilePath)) {
+            if (arrow.acquired !== room.userId || releaseItems.length > 0) {
+                const result = await explorer.acquireLock(arrow, releaseItems);
+                if (!result.success) {
+                    arrow.acquired = result.acquiredBy;
+                    room.highlightArrow(arrow, true);
+                    return;
+                } else {
+                    arrow.acquired = room.userId;
+                }
+            }
+        }
+
+        room.selectedArrow = arrow;
+        room.highlightArrow(arrow, true);
+        
+        if (room.event !== 'panning') {
+            room.saveState();
+        }
     },
 
     getMousePos(e) {
@@ -1010,6 +1579,10 @@ export const room = {
             if (room.editingBox === box) {
                 boxDiv.classList.add('editing');
             }
+            if (box.acquired && box.acquired !== room.userId) {
+                boxDiv.classList.add('locked-by-other');
+                boxDiv.setAttribute('data-acquired-by', box.acquired);
+            }
 
             boxDiv.style.left = (box.x + room.offset.x) + 'px';
             boxDiv.style.top = (box.y + room.offset.y) + 'px';
@@ -1136,6 +1709,18 @@ export const room = {
                 boxDiv.classList.add('selected');
             } else if (!isSelected && boxDiv.classList.contains('selected')) {
                 boxDiv.classList.remove('selected');
+            }
+
+            if (box.acquired && box.acquired !== room.userId) {
+                if (!boxDiv.classList.contains('locked-by-other')) {
+                    boxDiv.classList.add('locked-by-other');
+                }
+                boxDiv.setAttribute('data-acquired-by', box.acquired);
+            } else {
+                if (boxDiv.classList.contains('locked-by-other')) {
+                    boxDiv.classList.remove('locked-by-other');
+                    boxDiv.removeAttribute('data-acquired-by');
+                }
             }
 
             if (box.maximized) {
@@ -1377,8 +1962,13 @@ export const room = {
         relatedArrows.forEach(relatedArrow => {
             const path = room.calculateArrowPath(relatedArrow);
             const isSelected = room.selectedArrow === relatedArrow;
+            const isLockedByOther = relatedArrow.acquired && relatedArrow.acquired !== room.userId;
             const color = relatedArrow.tag && relatedArrow.tag.color ? relatedArrow.tag.color : null;
-            const strokeColor = color || (isSelected ? '#1a73e8' : '#5f6368');
+            let strokeColor = color || (isSelected ? '#1a73e8' : '#5f6368');
+            
+            if (isLockedByOther) {
+                strokeColor = '#ff0000';
+            }
 
             const x1 = path.x1 + room.offset.x;
             const y1 = path.y1 + room.offset.y;
@@ -1395,6 +1985,9 @@ export const room = {
             }
             arrowGroup.setAttribute('data-arrow-id', relatedArrow.id);
             arrowGroup.setAttribute('class', 'arrow');
+            if (isLockedByOther) {
+                arrowGroup.classList.add('locked-by-other');
+            }
             arrowGroup.owner = relatedArrow;
 
             const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -1479,8 +2072,13 @@ export const room = {
                 relatedArrows.forEach(relatedArrow => {
                 const path = room.calculateArrowPath(relatedArrow);
                 const isSelected = room.selectedArrow === relatedArrow;
+                const isLockedByOther = relatedArrow.acquired && relatedArrow.acquired !== room.userId;
                 const color = relatedArrow.tag && relatedArrow.tag.color ? relatedArrow.tag.color : null;
-                const strokeColor = color || (isSelected ? '#1a73e8' : '#5f6368');
+                let strokeColor = color || (isSelected ? '#1a73e8' : '#5f6368');
+                
+                if (isLockedByOther) {
+                    strokeColor = '#f59e0b';
+                }
 
                 const x1 = path.x1 + room.offset.x;
                 const y1 = path.y1 + room.offset.y;
@@ -1497,6 +2095,9 @@ export const room = {
                 }
                 arrowGroup.setAttribute('data-arrow-id', relatedArrow.id);
                 arrowGroup.setAttribute('class', 'arrow');
+                if (isLockedByOther) {
+                    arrowGroup.classList.add('locked-by-other');
+                }
                 arrowGroup.owner = relatedArrow;
 
                 const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -1613,16 +2214,29 @@ export const room = {
         }
 
         if (arrowGroup && arrow) {
+            const isLockedByOther = arrow.acquired && arrow.acquired !== room.userId;
+            
             if (isSelected) {
-                arrowGroup.setAttribute('class', 'selected');
+                arrowGroup.classList.add('selected');
                 arrowGroup.querySelectorAll('path').forEach(path => {
                     path.setAttribute('stroke-width', '2.5');
                 });
             } else {
-                arrowGroup.removeAttribute('class');
+                arrowGroup.classList.remove('selected');
                 arrowGroup.querySelectorAll('path').forEach(path => {
                     path.setAttribute('stroke-width', '1.5');
                 });
+            }
+            
+            // Ensure locked-by-other class is preserved/updated
+            if (isLockedByOther) {
+                if (!arrowGroup.classList.contains('locked-by-other')) {
+                    arrowGroup.classList.add('locked-by-other');
+                }
+            } else {
+                if (arrowGroup.classList.contains('locked-by-other')) {
+                    arrowGroup.classList.remove('locked-by-other');
+                }
             }
         }
     },
@@ -1937,23 +2551,68 @@ export const room = {
         this.hideContextMenu();
     },
 
-    resetSelection() {
+    resetSelection(skipSave = false, performRelease = true) {
         const prevSelectedBox = room.selectedBox;
         const prevSelectedBoxes = [...room.selectedBoxes];
         const prevSelectedArrow = room.selectedArrow;
+
+        let stateChanged = false;
 
         room.selectedBox = null;
         room.selectedBoxes = [];
         room.selectedArrow = null;
 
-        if (prevSelectedBox) room.highlightBox(prevSelectedBox, false);
-        prevSelectedBoxes.forEach(box => room.highlightBox(box, false));
-        if (prevSelectedArrow) room.highlightArrow(prevSelectedArrow, false);
+        // Release locks for previously selected boxes
+        prevSelectedBoxes.forEach(box => {
+            room.highlightBox(box, false);
+            if (box.acquired === room.userId) {
+                box.acquired = null;
+                stateChanged = true;
+            }
+        });
+
+        // Also check prevSelectedBox if it wasn't in the array
+        if (prevSelectedBox && !prevSelectedBoxes.includes(prevSelectedBox)) {
+            room.highlightBox(prevSelectedBox, false);
+            if (prevSelectedBox.acquired === room.userId) {
+                prevSelectedBox.acquired = null;
+                stateChanged = true;
+            }
+        }
+
+        if (prevSelectedArrow) {
+            room.highlightArrow(prevSelectedArrow, false);
+            if (prevSelectedArrow.acquired === room.userId) {
+                prevSelectedArrow.acquired = null;
+                stateChanged = true;
+            }
+        }
+
+        if (performRelease && explorer.currentFilePath && mesh.isMeshPath(explorer.currentFilePath)) {
+            const releaseItems = [];
+            prevSelectedBoxes.forEach(box => {
+                if (!releaseItems.includes(box)) releaseItems.push(box);
+            });
+            if (prevSelectedBox && !releaseItems.includes(prevSelectedBox)) {
+                releaseItems.push(prevSelectedBox);
+            }
+            if (prevSelectedArrow && !releaseItems.includes(prevSelectedArrow)) {
+                releaseItems.push(prevSelectedArrow);
+            }
+            
+            if (releaseItems.length > 0) {
+                explorer.acquireLock(null, releaseItems).catch(e => console.error('Release lock failed', e));
+            }
+        }
 
         room.selectionStart = null;
         room.selectionRect = null;
 
         room.element.style.cursor = 'default';
+
+        if (stateChanged && !skipSave) {
+            room.saveState(true);
+        }
     },
 
     hideContextMenu() {
@@ -2243,37 +2902,47 @@ export const room = {
         });
 
         const allArrows = [];
+        const isMesh = explorer.currentFilePath && mesh.isMeshPath(explorer.currentFilePath);
         
         // Collect all arrows from all boxes
         room.boxes.forEach(box => {
             if (box.arrows) {
                 box.arrows.forEach(arrow => {
-                    allArrows.push({
+                    const arrowData = {
                         sourceId: arrow.source.id,
                         targetId: arrow.target.id,
                         tag: arrow.tag || null
-                    });
+                    };
+                    if (isMesh) {
+                        arrowData.acquired = arrow.acquired || null;
+                    }
+                    allArrows.push(arrowData);
                 });
             }
         });
         
         return {
-            offset: { ...room.offset },
-            boxes: room.boxes.map(box => ({
-                id: box.id,
-                x: box.x,
-                y: box.y,
-                width: box.width,
-                height: box.height,
-                defaultWidth: box.defaultWidth,
-                defaultHeight: box.defaultHeight,
-                text: box.text || '',
-                expanded: !!box.expanded,
-                tag: box.tag || null,
-                type: box.type || 'text',
-                linkedNotePath: box.linkedNotePath || null,
-                scrollOffset: box.scrollOffset || 0
-            })),
+            boxes: room.boxes.map(box => {
+                const boxData = {
+                    id: box.id,
+                    x: box.x,
+                    y: box.y,
+                    width: box.width,
+                    height: box.height,
+                    defaultWidth: box.defaultWidth,
+                    defaultHeight: box.defaultHeight,
+                    text: box.text || '',
+                    expanded: !!box.expanded,
+                    tag: box.tag || null,
+                    type: box.type || 'text',
+                    linkedNotePath: box.linkedNotePath || null,
+                    scrollOffset: box.scrollOffset || 0
+                };
+                if (isMesh) {
+                    boxData.acquired = box.acquired || null;
+                }
+                return boxData;
+            }),
             arrows: allArrows
         };
     },
@@ -2308,7 +2977,8 @@ export const room = {
                 type: b.type || 'text',
                 linkedNotePath: b.linkedNotePath || null,
                 scrollOffset: b.scrollOffset || 0,
-                arrows: []
+                arrows: [],
+                acquired: b.acquired || null
             };
             idToBox.set(box.id, box);
             return box;
@@ -2326,7 +2996,8 @@ export const room = {
                 const arrow = {
                     source,
                     target,
-                    tag: tag
+                    tag: tag,
+                    acquired: a.acquired || null
                 };
                 source.arrows.push(arrow);
             }
@@ -2339,18 +3010,24 @@ export const room = {
         this.isDirty = false;
     },
 
-    saveState() {
+    saveState(immediate = false) {
+        this._syncActiveRoomContext();
         this.isDirty = true;
         const state = room.serializeState();
-        localStorage.setItem('nodeState', JSON.stringify(state));
+        const roomKey = this._activeRoomKey || this.getActiveRoomKey();
+        this._safeSetItem(this._getRoomStorageKey('nodeState', roomKey), JSON.stringify(state));
+        this._safeSetItem(this._getRoomStorageKey('nodeLocalState', roomKey), JSON.stringify({ offset: room.offset }));
+        this._touchRoomKey(roomKey);
         if (this.onStateChanged) {
-            this.onStateChanged();
+            this.onStateChanged(immediate);
         }
     },
 
     loadState(state) {
+        this._syncActiveRoomContext();
         if (!state) {
-            const saved = localStorage.getItem('nodeState');
+            const roomKey = this._activeRoomKey || this.getActiveRoomKey();
+            const saved = localStorage.getItem(this._getRoomStorageKey('nodeState', roomKey));
             if (!saved) return;
             state = JSON.parse(saved);
         }
@@ -2360,8 +3037,6 @@ export const room = {
         
         if (deserialized.offset) {
             room.offset = deserialized.offset;
-        } else {
-            room.offset = { x: 0, y: 0 };
         }
 
         room.selectedBox = null;
@@ -2369,41 +3044,54 @@ export const room = {
         room.selectedArrow = null;
 
         room.drawAll(true);
+        this._ensureHistoryBaseline(state ? room.serializeState() : undefined);
     },
 
     pushHistory() {
+        this._syncActiveRoomContext();
+        const roomKey = this._activeRoomKey || this.getActiveRoomKey();
+        const ctx = this._getRoomContext(roomKey);
         const state = room.serializeState();
 
-        if (room.historyIndex < room.history.length - 1) {
-            room.history = room.history.slice(0, room.historyIndex + 1);
+        if (ctx.historyIndex < ctx.history.length - 1) {
+            ctx.history = ctx.history.slice(0, ctx.historyIndex + 1);
         }
 
-        room.history.push(state);
+        ctx.history.push(state);
 
-        if (room.history.length > room.maxHistorySize) {
-            room.history.shift();
+        if (ctx.history.length > room.maxHistorySize) {
+            ctx.history.shift();
         } else {
-            room.historyIndex++;
+            ctx.historyIndex++;
         }
+        this._persistRoomHistory(roomKey);
     },
 
     undo() {
-        if (room.historyIndex > 0) {
-            room.historyIndex--;
-            const state = room.history[room.historyIndex];
+        this._syncActiveRoomContext();
+        const roomKey = this._activeRoomKey || this.getActiveRoomKey();
+        const ctx = this._getRoomContext(roomKey);
+        if (ctx.historyIndex > 0) {
+            ctx.historyIndex--;
+            const state = ctx.history[ctx.historyIndex];
             room.loadState(state);
             room.saveState();
+            this._persistRoomHistory(roomKey);
             return true;
         }
         return false;
     },
 
     redo() {
-        if (room.historyIndex < room.history.length - 1) {
-            room.historyIndex++;
-            const state = room.history[room.historyIndex];
+        this._syncActiveRoomContext();
+        const roomKey = this._activeRoomKey || this.getActiveRoomKey();
+        const ctx = this._getRoomContext(roomKey);
+        if (ctx.historyIndex < ctx.history.length - 1) {
+            ctx.historyIndex++;
+            const state = ctx.history[ctx.historyIndex];
             room.loadState(state);
             room.saveState();
+            this._persistRoomHistory(roomKey);
             return true;
         }
         return false;

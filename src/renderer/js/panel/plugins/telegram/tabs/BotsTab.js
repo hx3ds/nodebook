@@ -258,7 +258,8 @@ export class BotsTab {
                     ${UI.CodeBlock({
                         id: 'response-view',
                         content: response ? this.syntaxHighlight(response) : '<span style="color: #6a737d; font-style: italic;">Response will appear here...</span>',
-                        style: 'flex: 1; border: none; border-radius: 0; margin: 0;'
+                        style: 'flex: 1; border: none; border-radius: 0; margin: 0;',
+                        escape: false
                     })}
                 </div>
             </div>

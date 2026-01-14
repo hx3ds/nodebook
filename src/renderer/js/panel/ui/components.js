@@ -96,7 +96,7 @@ export const UI = {
         </div>
     `,
 
-    CodeBlock: ({ id, content, language = '', style = '' }) => `
-        <div id="${id}" class="ui-code-block" style="${style}">${escapeHtml(content)}</div>
+    CodeBlock: ({ id, content, language = '', style = '', escape = true }) => `
+        <div id="${id}" class="ui-code-block" style="${style}">${escape ? escapeHtml(content) : content}</div>
     `
 };

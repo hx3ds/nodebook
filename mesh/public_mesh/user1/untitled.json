@@ -1,0 +1,113 @@
+{
+  "boxes": [
+    {
+      "id": 1766571090396.8123,
+      "x": 699,
+      "y": 395,
+      "width": 160,
+      "height": 80,
+      "defaultWidth": 160,
+      "defaultHeight": 80,
+      "text": "",
+      "expanded": false,
+      "tag": {
+        "color": "transparent",
+        "name": "Transparent"
+      },
+      "type": "text",
+      "linkedNotePath": null,
+      "scrollOffset": 0,
+      "acquired": null
+    },
+    {
+      "id": 1766577543544.744,
+      "x": 557,
+      "y": 281,
+      "width": 158,
+      "height": 94,
+      "defaultWidth": 158,
+      "defaultHeight": 94,
+      "text": "",
+      "expanded": false,
+      "tag": {
+        "color": "transparent",
+        "name": "Transparent"
+      },
+      "type": "text",
+      "linkedNotePath": null,
+      "scrollOffset": 0,
+      "acquired": null
+    },
+    {
+      "id": 1766577545610.8381,
+      "x": 337,
+      "y": 220,
+      "width": 160,
+      "height": 80,
+      "defaultWidth": 160,
+      "defaultHeight": 80,
+      "text": "",
+      "expanded": false,
+      "tag": {
+        "color": "transparent",
+        "name": "Transparent"
+      },
+      "type": "text",
+      "linkedNotePath": null,
+      "scrollOffset": 0,
+      "acquired": null
+    },
+    {
+      "id": 1766588911442.4258,
+      "x": -398,
+      "y": -16,
+      "width": 160,
+      "height": 80,
+      "defaultWidth": 160,
+      "defaultHeight": 80,
+      "text": "",
+      "expanded": false,
+      "tag": {
+        "color": "transparent",
+        "name": "Transparent"
+      },
+      "type": "text",
+      "linkedNotePath": null,
+      "scrollOffset": 0,
+      "acquired": null
+    },
+    {
+      "id": 1766588910959.511,
+      "x": -355,
+      "y": -275,
+      "width": 160,
+      "height": 80,
+      "defaultWidth": 160,
+      "defaultHeight": 80,
+      "text": "asfdasdf",
+      "expanded": false,
+      "tag": {
+        "color": "transparent",
+        "name": "Transparent"
+      },
+      "type": "text",
+      "linkedNotePath": null,
+      "scrollOffset": 0,
+      "acquired": null
+    }
+  ],
+  "arrows": [
+    {
+      "sourceId": 1766577545610.8381,
+      "targetId": 1766577543544.744,
+      "tag": null,
+      "acquired": null
+    },
+    {
+      "sourceId": 1766588910959.511,
+      "targetId": 1766588911442.4258,
+      "tag": null,
+      "acquired": null
+    }
+  ]
+}

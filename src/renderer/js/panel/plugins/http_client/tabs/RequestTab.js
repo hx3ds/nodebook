@@ -400,11 +400,37 @@ export class RequestTab {
         if (!body) return '';
         if (contentType && contentType.includes('application/json')) {
             try {
-                return JSON.stringify(JSON.parse(body), null, 2);
+                return this.syntaxHighlight(JSON.parse(body));
             } catch (e) {
-                return body;
+                return UI.escapeHtml(body);
             }
         }
-        return body;
+        return UI.escapeHtml(body);
+    }
+
+    syntaxHighlight(json) {
+        if (typeof json !== 'string') {
+            json = JSON.stringify(json, undefined, 2);
+        }
+        json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+            let cls = 'number';
+            if (/^"/.test(match)) {
+                if (/:$/.test(match)) {
+                    cls = 'key';
+                    return '<span style="color: #d32f2f;">' + match.replace(/:$/, '') + '</span>:';
+                } else {
+                    cls = 'string';
+                    return '<span style="color: #2e7d32;">' + match + '</span>';
+                }
+            } else if (/true|false/.test(match)) {
+                cls = 'boolean';
+                return '<span style="color: #7b1fa2;">' + match + '</span>';
+            } else if (/null/.test(match)) {
+                cls = 'null';
+                return '<span style="color: #757575;">' + match + '</span>';
+            }
+            return '<span style="color: #1565c0;">' + match + '</span>';
+        });
     }
 }

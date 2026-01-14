@@ -99,7 +99,6 @@ export class PanelManager {
             pluginItem.style.justifyContent = 'space-between';
             pluginItem.innerHTML = `
                 <span>${plugin.name}</span>
-                <span style="font-size: 0.8em;">${isExpanded ? '▼' : '▶'}</span>
             `;
             
             pluginItem.addEventListener('click', () => {

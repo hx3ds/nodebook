@@ -121,10 +121,8 @@ export const roomEventHandlers = {
                         break;
                     case 'arrow':
                         registerEvent('selectingArrow')
-                        room.resetSelection();
                         const arrow = room.findArrowAt(pos);
-                        room.selectedArrow = arrow;
-                        room.highlightArrow(arrow, true);
+                        room.selectArrow(arrow, ifAppend);
                         break;
                     case 'room':
                         registerEvent('selectingRoom');
@@ -156,8 +154,7 @@ export const roomEventHandlers = {
                     case 'arrow':
                         registerEvent('showingArrowContextMenu')
                         const arrow = room.findArrowAt(pos);
-                        room.selectedArrow = arrow;
-                        room.highlightArrow(arrow, true);
+                        room.selectArrow(arrow);
                         room.showArrowContextMenu(menuPos.x, menuPos.y);
                         break;
                     case 'room':
@@ -337,6 +334,7 @@ export const roomEventHandlers = {
                 room.selectionStart = null;
                 room.selectionRect = null;
                 room.updateSelectionPreview();
+                room.saveState();
                 break;
             case 'movingBox':
                 // Moving is complete, save state and redraw connected arrows

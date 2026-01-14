@@ -1,0 +1,20 @@
+{
+  "ENV": "development",
+  "DB_HOST": "127.0.0.1",
+  "DB_PORT": 5432,
+  "DB_NAME": "consul_db",
+  "DB_USER": "consul",
+  "DB_PASSWORD": "as1001",
+  "HOST": "127.0.0.1",
+  "PORT": 8883,
+  "SMTP_HOST": "smtp.gmail.com",
+  "SMTP_PORT": 587,
+  "SMTP_USERNAME": "hx3ds13@gmail.com",
+  "SMTP_PASSWORD": "zneopogwxiqfuxbn",
+  "SMTP_FROM_EMAIL": "hx3ds13@gmail.com",
+  "ADMIN_BOT_USERNAME": "david_bridge_bot",
+  "ADMIN_BOT_TOKEN": "8557061724:AAG1unP_d-Fo2lu9jSpxw2tmlIUM3kTDXzo",
+  "TELEGRAM_BASE_URL": "https://api.telegram.org/bot",
+  "JWT_SECRET_KEY": "dev_jwt_secret_change_me",
+  "JWT_COOKIE_NAME": "auth_token"
+}

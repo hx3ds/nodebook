@@ -63,6 +63,7 @@ export const control = {
         document.getElementById('proj-playlist-toggle').addEventListener('click', handlers.handlePlaylistToggle);
         document.getElementById('proj-vol-toggle').addEventListener('click', handlers.handleVolumeToggle);
         document.getElementById('proj-bg-toggle').addEventListener('click', handlers.handleBgToggle);
+        document.getElementById('proj-dark-mode-toggle').addEventListener('click', handlers.handleDarkModeToggle);
         document.getElementById('proj-scale-toggle').addEventListener('click', handlers.handleScaleToggle);
         document.getElementById('proj-room-toggle').addEventListener('click', handlers.handleRoomToggle);
         document.getElementById('proj-panel-toggle').addEventListener('click', handlers.handlePanelToggle);
@@ -89,20 +90,12 @@ export const control = {
         });
 
         // Dragging Events for Controls Layer
-        // We attach mousedown to the specific element, but mousemove/up to window to handle dragging outside
-        // Note: controls-layer has pointer-events: none, but its children have pointer-events: auto.
-        // We need to enable pointer-events on controls-layer for this to work, or attach to a handle.
-        // The user wants to click and hold "controls overlay", implying the empty space or the container itself.
-        // Currently css has #controls-layer { pointer-events: none; } and .controls-container { pointer-events: none; }
-        // but children like buttons have auto.
-        // To support dragging the whole container, we need to capture events on the container.
-        // Let's make .controls-container interactive for dragging, but ensure buttons still work.
-        
+        // Enable pointer events on the container to allow dragging the overlay,
+        // while ensuring interactive children (buttons, inputs) still work.
         const container = document.querySelector('.controls-container');
         if (container) {
-            container.style.pointerEvents = 'auto'; // Enable events on the container for dragging
+            container.style.pointerEvents = 'auto'; 
             container.addEventListener('mousedown', handlers.handleMouseDown);
-            // Prevent default drag behavior to avoid issues
             container.addEventListener('dragstart', (e) => e.preventDefault());
         }
 
@@ -206,11 +199,7 @@ export const control = {
         const scaleInput = document.getElementById('proj-scale-input');
         const scaleValue = document.getElementById('proj-scale-value');
         if (scaleInput && projection.scale !== undefined) {
-            // Only update input value if user is not dragging it? 
-            // For now, simple update is fine as long as we don't have external scale changes often
-            // scaleInput.value = projection.scale; 
-            // Actually, we shouldn't overwrite if user is dragging, but here update() is called on init or state change.
-            // Let's rely on event handler to update UI value during drag.
+             // scaleInput.value = projection.scale; // Disabled to avoid conflict during drag
         }
 
         const searchBar = document.getElementById('proj-search-bar');

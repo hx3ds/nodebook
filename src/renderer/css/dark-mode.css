@@ -1,0 +1,207 @@
+/* Dark Mode Styles */
+body.dark-mode {
+    --dark-bg: #1a1b26;
+    --dark-surface: rgba(30, 30, 46, 0.95);
+    --dark-border: rgba(255, 255, 255, 0.1);
+    --dark-text: #e0e0e0;
+    --dark-text-muted: #a0a0a0;
+    --dark-accent: #00f3ff;
+
+    /* Sidebar Variables */
+    --sidebar-bg: #1a1b26;
+    --sidebar-text: #e0e0e0;
+    --sidebar-subtext: #a0a0a0;
+    --sidebar-border: rgba(255, 255, 255, 0.1);
+    --sidebar-hover: rgba(255, 255, 255, 0.05);
+    --sidebar-active: #00f3ff;
+    --sidebar-selected-text: #ffffff;
+    --sidebar-header-bg: #1a1b26;
+    --sidebar-guide: rgba(255, 255, 255, 0.1);
+}
+
+/* Controls Layer Overrides */
+body.dark-mode .controls-bar,
+body.dark-mode .seek-bar-container,
+body.dark-mode .volume-bar-container,
+body.dark-mode .bg-bar-container,
+body.dark-mode .search-bar-container,
+body.dark-mode .playlist-container {
+    background: var(--dark-surface);
+    border-color: var(--dark-border);
+    color: var(--dark-text);
+}
+
+body.dark-mode .control-btn {
+    color: var(--dark-text-muted);
+}
+
+body.dark-mode .control-btn:hover,
+body.dark-mode .control-btn.active {
+    color: var(--dark-accent);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--dark-border);
+}
+
+body.dark-mode .search-input {
+    color: var(--dark-text);
+}
+
+body.dark-mode .search-input::placeholder {
+    color: var(--dark-text-muted);
+}
+
+body.dark-mode .playlist-header {
+    border-bottom-color: var(--dark-border);
+}
+
+body.dark-mode .playlist-title {
+    color: var(--dark-text);
+}
+
+body.dark-mode .playlist-count {
+    color: var(--dark-text-muted);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .playlist-item {
+    border-bottom-color: var(--dark-border);
+}
+
+body.dark-mode .playlist-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+body.dark-mode .playlist-item-name {
+    color: var(--dark-text);
+}
+
+body.dark-mode .playlist-item-type {
+    color: var(--dark-text-muted);
+}
+
+/* Box Styles Overrides */
+body.dark-mode .box {
+    background: #242530;
+    border-color: #4a4b5a;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-mode .box.selected {
+    border-color: #60a5fa;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-mode .box.editing {
+    border-color: var(--dark-accent);
+    box-shadow: 0 0 0 4px rgba(0, 243, 255, 0.2);
+}
+
+body.dark-mode .box-text {
+    color: #e0e0e0;
+}
+
+body.dark-mode .box-text-container::-webkit-scrollbar-thumb {
+    background: #4a4b5a;
+}
+
+body.dark-mode .box-text-container::-webkit-scrollbar-thumb:hover {
+    background: #606275;
+}
+
+/* Arrow Styles Overrides */
+/* Note: Arrows are SVGs. If they don't have explicit stroke, we can try to target them.
+   If they have explicit stroke in inline styles, this might not work without !important or JS.
+   Assuming they use defaults or classes.
+*/
+body.dark-mode #arrowSpace path:not(.hit-area) {
+    stroke: #a0a0a0;
+}
+
+body.dark-mode g.locked-by-other path {
+    stroke: #ff4444; /* Brighter red for dark mode */
+}
+
+/* Context Menus */
+body.dark-mode #boxContextMenu,
+body.dark-mode #arrowContextMenu,
+body.dark-mode #roomContextMenu,
+body.dark-mode #textContextMenu,
+body.dark-mode #fileContextMenu,
+body.dark-mode .submenu {
+    background: rgba(30, 30, 46, 0.98);
+    border-color: var(--dark-border);
+}
+
+body.dark-mode #boxContextMenu button,
+body.dark-mode #arrowContextMenu button,
+body.dark-mode #roomContextMenu button,
+body.dark-mode #textContextMenu button,
+body.dark-mode #fileContextMenu button,
+body.dark-mode .submenu button {
+    color: var(--dark-text);
+}
+
+body.dark-mode #boxContextMenu button:hover,
+body.dark-mode #arrowContextMenu button:hover,
+body.dark-mode #roomContextMenu button:hover,
+body.dark-mode #textContextMenu button:hover,
+body.dark-mode #fileContextMenu button:hover,
+body.dark-mode .submenu button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--dark-accent);
+}
+
+body.dark-mode .menu-divider,
+body.dark-mode .submenu-divider {
+    background: var(--dark-border);
+}
+
+body.dark-mode .menu-shortcut {
+    color: var(--dark-text-muted);
+}
+
+/* HTML Edit Mode */
+body.dark-mode .box-text.html-mode {
+    color: #e0e0e0;
+}
+
+/* Dialogs */
+body.dark-mode #promptDialogContent,
+body.dark-mode #customTagDialogContent {
+    background: #242530;
+    color: #e0e0e0;
+    border: 1px solid var(--dark-border);
+}
+
+body.dark-mode #promptDialogTitle,
+body.dark-mode #customTagDialogTitle {
+    color: #e0e0e0;
+}
+
+body.dark-mode #promptDialogInput,
+body.dark-mode #customTagName,
+body.dark-mode #customTagColorInput {
+    background: #1a1b26;
+    color: #e0e0e0;
+    border: 1px solid var(--dark-border);
+}
+
+/* Sidebar Specifics */
+body.dark-mode #sidebarResizer:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode #sidebarActions button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--sidebar-active);
+}
+
+body.dark-mode #fileTree::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Tree Item Overrides */
+body.dark-mode .tree-item-header.selected,
+body.dark-mode .tree-item-header.active-file {
+    background: rgba(0, 243, 255, 0.1) !important;
+}

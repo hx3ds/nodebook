@@ -40,6 +40,10 @@
     pointer-events: none;
 }
 
+g.locked-by-other path {
+    stroke: #ff0000;
+}
+
 /* Box Styles */
 .box {
     position: absolute;
@@ -62,6 +66,27 @@
     border: 1px solid #1a73e8;
     box-shadow: 0 0 0 4px rgba(26, 115, 232, 0.3);
     z-index: 32;
+}
+
+.box.locked-by-other {
+    border: 1px solid #ff0000;
+    box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.3);
+    z-index: 31;
+}
+
+.box.locked-by-other::after {
+    content: attr(data-acquired-by);
+    position: absolute;
+    top: -20px;
+    right: 0;
+    background: #ff0000;
+    color: white;
+    font-size: 10px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 35;
 }
 
 .box-arrow-container {

@@ -1,6 +1,6 @@
 // File Explorer Module
 import { dialog } from './dialog.js';
-import { room } from '../room/room.js';
+import { mesh } from './mesh.js';
 
 const ICONS = {
     arrowRight: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>',
@@ -8,13 +8,15 @@ const ICONS = {
     folder: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" /></svg>', 
     folderOpen: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h4.5c.625 0 1.25.196 1.768.558l.864.654c.518.362 1.142.558 1.768.558H19.5A2.25 2.25 0 0121.75 6v3.776" /></svg>',
     file: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>',
-    json: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>'
+    json: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>',
+    globe: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.546-3.1 1.487-4.305" /></svg>'
 };
 
 export const explorer = {
     rootPath: null,
     currentFilePath: null,
     expandedFolders: new Set(),
+    saveDebounceTimer: null,
     
     async init() {
         const openFolderBtn = document.getElementById('openFolderBtn');
@@ -41,14 +43,14 @@ export const explorer = {
             });
         }
         
-        // File Tree Drop Zone (Root)
+        // Initialize file tree drag-and-drop
         if (fileTree) {
             fileTree.addEventListener('dragover', (e) => this.handleContainerDragOver(e));
             fileTree.addEventListener('dragleave', (e) => this.handleContainerDragLeave(e));
             fileTree.addEventListener('drop', (e) => this.handleContainerDrop(e));
         }
         
-        // File context menu
+        // Initialize global click listener to close context menu
         document.addEventListener('click', (e) => {
             const fileMenu = document.getElementById('fileContextMenu');
             if (fileMenu && !fileMenu.contains(e.target)) {
@@ -63,7 +65,7 @@ export const explorer = {
             }
         });
         
-        // Sidebar empty space context menu
+        // Initialize sidebar context menu
         const sidebar = document.getElementById('sidebar');
         if (sidebar) {
             sidebar.addEventListener('contextmenu', (e) => {
@@ -86,11 +88,27 @@ export const explorer = {
             fileMenuDelete.addEventListener('click', () => this.deleteSelectedFile());
         }
         
+        const fileMenuNewFile = document.getElementById('fileMenuNewFile');
+        if (fileMenuNewFile) {
+            fileMenuNewFile.addEventListener('click', () => {
+                this.createNewFile();
+                document.getElementById('fileContextMenu').style.display = 'none';
+            });
+        }
+
+        const fileMenuNewFolder = document.getElementById('fileMenuNewFolder');
+        if (fileMenuNewFolder) {
+            fileMenuNewFolder.addEventListener('click', () => {
+                this.createNewFolder();
+                document.getElementById('fileContextMenu').style.display = 'none';
+            });
+        }
+        
         const fileMenuHideSidebar = document.getElementById('fileMenuHideSidebar');
         if (fileMenuHideSidebar) {
             fileMenuHideSidebar.addEventListener('click', () => {
-                if (room && room.toggleSidebar) {
-                    room.toggleSidebar();
+                if (explorer.room && explorer.room.toggleSidebar) {
+                    explorer.room.toggleSidebar();
                 }
                 document.getElementById('fileContextMenu').style.display = 'none';
                 // Clear selection
@@ -101,10 +119,10 @@ export const explorer = {
             });
         }
         
-        // Sidebar resizer
+        // Initialize sidebar resize handler
         this.setupSidebarResizer();
         
-        // Load sidebar collapsed state
+        // Restore sidebar collapsed state
         const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
         if (isCollapsed) {
             const sidebarContainer = document.getElementById('sidebarContainer');
@@ -113,7 +131,7 @@ export const explorer = {
             }
         }
         
-        // Load last opened folder
+        // Restore last opened folder and file
         const lastFolder = localStorage.getItem('lastOpenedFolder');
         if (lastFolder && window.electronAPI) {
             const exists = await window.electronAPI.pathExists(lastFolder);
@@ -124,17 +142,22 @@ export const explorer = {
                 // Load last opened file
                 const lastFile = localStorage.getItem('lastOpenedFile');
                 if (lastFile) {
-                    const fileExists = await window.electronAPI.pathExists(lastFile);
-                    if (fileExists) {
-                        await this.openFile(lastFile);
+                    // Check if mesh file or local file
+                    if (mesh.isMeshPath(lastFile)) {
+                         await this.openFile(lastFile);
+                    } else {
+                        const fileExists = await window.electronAPI.pathExists(lastFile);
+                        if (fileExists) {
+                            await this.openFile(lastFile);
+                        }
                     }
                 }
             }
         }
 
-        room.onStateChanged = () => {
+        explorer.room.onStateChanged = (immediate) => {
             if (explorer.currentFilePath) {
-                explorer.saveCurrentFile();
+                explorer.saveCurrentFile(immediate);
             }
         };
     },
@@ -206,54 +229,69 @@ export const explorer = {
     },
     
     async refreshFileTree() {
-        if (!this.rootPath) return;
-        
         const fileTree = document.getElementById('fileTree');
         fileTree.innerHTML = '';
         
-        document.getElementById('currentFolderPath').textContent = this.rootPath;
-        
-        // Ensure root is expanded by default so content is visible
-        this.expandedFolders.add(this.rootPath);
-        
-        // Derive folder name from path
-        const separator = this.rootPath.includes('\\') ? '\\' : '/';
-        let folderName = this.rootPath.split(separator).pop();
-        if (!folderName) folderName = this.rootPath; // Fallback if split fails or root drive
-
-        // Create a root item representing the opened folder
-        const rootItem = {
-            name: folderName,
-            path: this.rootPath,
-            isDirectory: true
-        };
-
-        try {
-            // Create the root item at level 0
-            // createTreeItem will check expandedFolders and call renderDirectory to populate children
-            const rootEl = this.createTreeItem(rootItem, 0);
+        // Render local file system root
+        if (this.rootPath) {
+            document.getElementById('currentFolderPath').textContent = this.rootPath;
             
-            // Disable dragging for the root node itself (optional but good practice)
-            const header = rootEl.querySelector('.tree-item-header');
-            if (header) {
-                header.draggable = false;
-                // Add a special class if needed for styling
-                header.classList.add('root-folder');
-            }
+            // Expand root by default
+            this.expandedFolders.add(this.rootPath);
+            
+            // Extract folder name from path
+            const separator = this.rootPath.includes('\\') ? '\\' : '/';
+            let folderName = this.rootPath.split(separator).pop();
+            if (!folderName) folderName = this.rootPath; 
 
-            fileTree.appendChild(rootEl);
-        } catch (error) {
-            console.error('Error refreshing file tree:', error);
+            const rootItem = {
+                name: folderName,
+                path: this.rootPath,
+                isDirectory: true
+            };
+
+            try {
+                const rootEl = this.createTreeItem(rootItem, 0);
+                const header = rootEl.querySelector('.tree-item-header');
+                if (header) {
+                    header.draggable = false;
+                    header.classList.add('root-folder');
+                }
+                fileTree.appendChild(rootEl);
+            } catch (error) {
+                console.error('Error refreshing file tree:', error);
+            }
         }
+        
+        // Render Mesh network root
+        this.renderMeshRoot(fileTree);
     },
     
+    renderMeshRoot(container) {
+        const meshRoot = {
+            name: 'Mesh Network',
+            path: 'mesh://',
+            isDirectory: true
+        };
+        const el = this.createTreeItem(meshRoot, 0);
+        // Set custom globe icon for Mesh root
+        const icon = el.querySelector('.tree-item-icon');
+        if(icon) icon.innerHTML = ICONS.globe;
+        
+        container.appendChild(el);
+    },
+
     async renderDirectory(dirPath, container, level) {
+        if (mesh.isMeshPath(dirPath)) {
+            return this.renderMeshDirectory(dirPath, container, level);
+        }
+
         if (!window.electronAPI) return;
         
         try {
             const items = await window.electronAPI.readDirectory(dirPath);
             
-            // Sort: directories first, then files, alphabetically
+            // Sort items: directories first, then files
             items.sort((a, b) => {
                 if (a.isDirectory && !b.isDirectory) return -1;
                 if (!a.isDirectory && b.isDirectory) return 1;
@@ -269,12 +307,32 @@ export const explorer = {
         }
     },
     
+    async renderMeshDirectory(path, container, level) {
+        try {
+            const items = await mesh.readDirectory(path) || [];
+            
+            items.sort((a, b) => {
+                if (a.isDirectory && !b.isDirectory) return -1;
+                if (!a.isDirectory && b.isDirectory) return 1;
+                return a.name.localeCompare(b.name);
+            });
+            
+            for (const item of items) {
+                const itemEl = this.createTreeItem(item, level);
+                container.appendChild(itemEl);
+            }
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = `<div style="padding-left:${level*12+10}px; color:red; font-size: 0.9em;">Error loading mesh</div>`;
+        }
+    },
+    
+    // Create DOM element for tree item
     createTreeItem(item, level) {
-        // Create wrapper node
         const nodeDiv = document.createElement('div');
         nodeDiv.className = 'tree-node';
 
-        // Create header (the visible row)
+        // Header (visible row)
         const headerDiv = document.createElement('div');
         headerDiv.className = 'tree-item-header';
         headerDiv.style.paddingLeft = (level * 12 + 10) + 'px';
@@ -282,13 +340,12 @@ export const explorer = {
         headerDiv.dataset.type = item.isDirectory ? 'folder' : 'file';
         headerDiv.draggable = true;
         
-        // Drag events
         headerDiv.addEventListener('dragstart', (e) => this.handleDragStart(e, item));
         headerDiv.addEventListener('dragover', (e) => this.handleDragOver(e, item, headerDiv));
         headerDiv.addEventListener('dragleave', (e) => this.handleDragLeave(e, headerDiv));
         headerDiv.addEventListener('drop', (e) => this.handleDrop(e, item));
         
-        // Expand arrow for directories
+        // Expand/Collapse arrow
         const expandSpan = document.createElement('span');
         expandSpan.className = 'tree-item-expand';
         if (item.isDirectory) {
@@ -299,7 +356,7 @@ export const explorer = {
             expandSpan.classList.add('no-children');
         }
         
-        // Icon
+        // File/Folder Icon
         const iconSpan = document.createElement('span');
         iconSpan.className = 'tree-item-icon';
         if (item.isDirectory) {
@@ -320,14 +377,13 @@ export const explorer = {
         headerDiv.appendChild(iconSpan);
         headerDiv.appendChild(labelSpan);
         
-        // Event listeners
         headerDiv.addEventListener('click', (e) => this.handleItemClick(item, nodeDiv, level, e));
         headerDiv.addEventListener('dblclick', (e) => this.handleItemDoubleClick(item, e));
         headerDiv.addEventListener('contextmenu', (e) => this.handleItemContextMenu(item, headerDiv, e));
         
         nodeDiv.appendChild(headerDiv);
 
-        // If directory is expanded, render its children
+        // Render children if expanded
         if (item.isDirectory && this.expandedFolders.has(item.path)) {
             const childrenDiv = document.createElement('div');
             childrenDiv.className = 'tree-item-children';
@@ -335,7 +391,6 @@ export const explorer = {
             this.renderDirectory(item.path, childrenDiv, level + 1);
         }
         
-        // Highlight active file
         if (this.currentFilePath === item.path) {
             headerDiv.classList.add('active-file');
         }
@@ -355,6 +410,9 @@ export const explorer = {
                 expandSpan.classList.remove('expanded');
                 iconSpan.innerHTML = ICONS.folder;
                 
+                // Reset to generic folder icon unless it's mesh root (which has custom icon handled in createTreeItem, but here we override)
+                if (item.path === 'mesh://') iconSpan.innerHTML = ICONS.globe;
+
                 const childrenDiv = nodeDiv.querySelector('.tree-item-children');
                 if (childrenDiv) {
                     childrenDiv.remove();
@@ -364,6 +422,8 @@ export const explorer = {
                 expandSpan.innerHTML = ICONS.arrowDown;
                 expandSpan.classList.add('expanded');
                 iconSpan.innerHTML = ICONS.folderOpen;
+                
+                if (item.path === 'mesh://') iconSpan.innerHTML = ICONS.globe;
 
                 const childrenDiv = document.createElement('div');
                 childrenDiv.className = 'tree-item-children';
@@ -385,7 +445,7 @@ export const explorer = {
         e.preventDefault();
         e.stopPropagation();
         
-        // Remove previous selection
+        // Deselect previously selected items
         document.querySelectorAll('.tree-item-header.selected').forEach(el => {
             el.classList.remove('selected');
         });
@@ -395,15 +455,53 @@ export const explorer = {
         
         const menu = document.getElementById('fileContextMenu');
         
-        // Show file-specific buttons
+        // Show file context menu options
         document.getElementById('fileMenuOpen').style.display = 'flex';
-        document.getElementById('fileMenuRename').style.display = 'flex';
-        document.getElementById('fileMenuDelete').style.display = 'flex';
+        
+        // Configure menu for directory vs file
+        if (item.isDirectory) {
+            // Mesh root is read-only for file creation
+            if (item.path === 'mesh://') {
+                document.getElementById('fileMenuNewFile').style.display = 'none';
+                document.getElementById('fileMenuNewFolder').style.display = 'none';
+            } else {
+                document.getElementById('fileMenuNewFile').style.display = 'flex';
+                document.getElementById('fileMenuNewFolder').style.display = 'flex';
+            }
+        } else {
+            document.getElementById('fileMenuNewFile').style.display = 'none';
+            document.getElementById('fileMenuNewFolder').style.display = 'none';
+        }
+
+        // Determine edit permissions
+        let allowEdit = true;
+
+        // Restrict editing for roots
+        if (this.rootPath && item.path === this.rootPath) {
+            allowEdit = false;
+        }
+
+        if (mesh.isMeshPath(item.path)) {
+            const parts = mesh.getSubPath(item.path).split('/').filter(p => p);
+            // parts=[] (mesh root) or parts=['user'] (user root)
+            if (parts.length < 2) {
+                allowEdit = false;
+            }
+        }
+
+        if (allowEdit) {
+            document.getElementById('fileMenuRename').style.display = 'flex';
+            document.getElementById('fileMenuDelete').style.display = 'flex';
+        } else {
+            document.getElementById('fileMenuRename').style.display = 'none';
+            document.getElementById('fileMenuDelete').style.display = 'none';
+        }
+        
         const divider = menu.querySelector('.menu-divider');
         if (divider) divider.style.display = 'block';
         
-        if (room && room.adjustMenuPosition) {
-            room.adjustMenuPosition(menu, e.clientX, e.clientY);
+        if (explorer.room && explorer.room.adjustMenuPosition) {
+            explorer.room.adjustMenuPosition(menu, e.clientX, e.clientY);
         } else {
             menu.style.display = 'block';
             menu.style.left = e.clientX + 'px';
@@ -421,14 +519,16 @@ export const explorer = {
         const menu = document.getElementById('fileContextMenu');
         
         // Hide file-specific buttons
+        document.getElementById('fileMenuNewFile').style.display = 'none';
+        document.getElementById('fileMenuNewFolder').style.display = 'none';
         document.getElementById('fileMenuOpen').style.display = 'none';
         document.getElementById('fileMenuRename').style.display = 'none';
         document.getElementById('fileMenuDelete').style.display = 'none';
         const divider = menu.querySelector('.menu-divider');
         if (divider) divider.style.display = 'none';
         
-        if (room && room.adjustMenuPosition) {
-            room.adjustMenuPosition(menu, e.clientX, e.clientY);
+        if (explorer.room && explorer.room.adjustMenuPosition) {
+            explorer.room.adjustMenuPosition(menu, e.clientX, e.clientY);
         } else {
             menu.style.display = 'block';
             menu.style.left = e.clientX + 'px';
@@ -437,6 +537,54 @@ export const explorer = {
     },
     
     async openFile(filePath) {
+        // Save current file if modified before opening new one
+        if (this.currentFilePath && explorer.room.isDirty) {
+             await this.saveCurrentFile(true);
+        }
+
+        if (this.currentFilePath && this.currentFilePath !== filePath && mesh.isMeshPath(this.currentFilePath)) {
+            await explorer.room.releaseAllLocksForPath(this.currentFilePath);
+        }
+
+        // Load file from Mesh network
+        if (mesh.isMeshPath(filePath)) {
+            try {
+                const content = await mesh.readFile(filePath);
+                
+                let data;
+                try {
+                    data = JSON.parse(content);
+                } catch (e) {
+                    if (!content.trim()) {
+                        data = { boxes: [], arrows: [] };
+                    } else {
+                        console.error('JSON parse error', e);
+                        throw new Error('Invalid file format');
+                    }
+                }
+                
+                this.currentFilePath = filePath;
+                localStorage.setItem('lastOpenedFile', filePath);
+                
+                this.expandParentFolders(filePath);
+                await this.refreshFileTree();
+                
+                const treeItem = document.querySelector(`[data-path="${filePath}"]`);
+                if (treeItem) {
+                    treeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+                
+                explorer.room.loadState(data);
+                explorer.room.markClean();
+                explorer.room.drawAll(); 
+                explorer.room.ensureWebSocketForCurrentFile();
+                await explorer.room.fetchInitialLocks();
+            } catch(e) {
+                alert(e.message);
+            }
+            return;
+        }
+
         if (!window.electronAPI) return;
         
         try {
@@ -446,39 +594,30 @@ export const explorer = {
             try {
                 data = JSON.parse(content);
             } catch (e) {
-                // Not a valid JSON, maybe a newly created empty file or other text file
-                // Try to initialize as empty state if empty
                 if (!content.trim()) {
                     data = { boxes: [], arrows: [] };
                 } else {
-                    // Try to parse anyway, or show error?
-                    // For now, let's treat non-JSON text as potential "text content" if we were to support it,
-                    // but the requirement says "support regardless file name, try parsing it to load".
-                    // So if parsing fails, we might just throw or alert.
-                    // But maybe user wants to open ANY file and see if it works.
-                    // If it fails to parse, we can't loadState.
+                    // Handle empty or invalid JSON
                     console.error('JSON parse error, attempting to load as empty/raw', e);
                     throw new Error('Invalid file format');
                 }
             }
             
-            // Set current file path BEFORE refreshing tree so the active-file class gets applied
             this.currentFilePath = filePath;
             localStorage.setItem('lastOpenedFile', filePath);
             
-            // Expand parent folders to make file visible
             this.expandParentFolders(filePath);
             await this.refreshFileTree();
             
-            // Scroll the active file into view
             const treeItem = document.querySelector(`[data-path="${filePath}"]`);
             if (treeItem) {
                 treeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
             
-            room.loadState(data);
-            room.markClean();
-            room.drawAll(); // Full render when loading file
+            explorer.room.loadState(data);
+            explorer.room.markClean();
+            explorer.room.drawAll();
+            explorer.room.ensureWebSocketForCurrentFile();
         } catch (error) {
             console.error('Error opening file:', error);
             alert('Failed to open file: ' + error.message);
@@ -486,12 +625,20 @@ export const explorer = {
     },
     
     expandParentFolders(filePath) {
+        if (mesh.isMeshPath(filePath)) {
+             const parts = mesh.getSubPath(filePath).split('/');
+             // mesh://user/file -> parts=[user, file]
+             if (parts.length > 1) {
+                 this.expandedFolders.add('mesh://');
+                 this.expandedFolders.add('mesh://' + parts[0]);
+             }
+             return;
+        }
+
         if (!this.rootPath) return;
         
-        // Get directory path
         const dirPath = filePath.substring(0, filePath.lastIndexOf(window.electronAPI ? '\\' : '/'));
         
-        // Expand all parent directories
         let currentPath = this.rootPath;
         const pathParts = dirPath.replace(this.rootPath, '').split(/[\\\/]/).filter(p => p);
         
@@ -501,63 +648,153 @@ export const explorer = {
         }
     },
     
-    async saveCurrentFile() {
-        if (!this.currentFilePath || !window.electronAPI) return;
+    async saveCurrentFile(immediate = false) {
+        if (!this.currentFilePath) return;
+
+        if (mesh.isMeshPath(this.currentFilePath)) {
+            // Clear existing timer if any
+            if (this.saveDebounceTimer) {
+                clearTimeout(this.saveDebounceTimer);
+                this.saveDebounceTimer = null;
+            }
+
+            const saveAction = async () => {
+                try {
+                    const state = explorer.room.serializeState();
+                    const content = JSON.stringify(state, null, 2);
+                    
+                    await mesh.writeFile(this.currentFilePath, content);
+                    
+                    // Only mark clean if state hasn't changed during save
+                    const currentState = JSON.stringify(explorer.room.serializeState(), null, 2);
+                    if (currentState === content) {
+                        explorer.room.markClean();
+                    }
+                    this.saveDebounceTimer = null;
+                } catch(e) {
+                     console.error('Save failed:', e);
+                }
+            };
+
+            if (immediate) {
+                await saveAction();
+            } else {
+                this.saveDebounceTimer = setTimeout(saveAction, 1000);
+            }
+            return;
+        }
+        
+        if (!window.electronAPI) return;
         
         try {
-            const state = room.serializeState();
+            const state = explorer.room.serializeState();
             const content = JSON.stringify(state, null, 2);
             await window.electronAPI.writeFile(this.currentFilePath, content);
-            room.markClean();
+            explorer.room.markClean();
         } catch (error) {
             console.error('Error saving file:', error);
             alert('Failed to save file: ' + error.message);
         }
     },
-    
+
     async createNewFile() {
-        if (!this.rootPath || !window.electronAPI) {
-            alert('Please open a folder first');
+        let targetPath = this.rootPath;
+        // Default to selected directory
+        if (this.selectedItem && this.selectedItem.isDirectory) {
+            targetPath = this.selectedItem.path;
+        }
+
+        // Handle Mesh File
+        if (targetPath && mesh.isMeshPath(targetPath)) {
+            const fileName = await dialog.prompt('Enter file name:', 'untitled.json', 'New File');
+            if (!fileName) return;
+            const finalName = fileName.endsWith('.json') ? fileName : fileName + '.json';
+            
+            const separator = '/';
+            const newPath = targetPath.endsWith(separator) ? targetPath + finalName : targetPath + separator + finalName;
+            
+            try {
+                const emptyState = { boxes: [], arrows: [] };
+                const content = JSON.stringify(emptyState, null, 2);
+                
+                await mesh.writeFile(newPath, content);
+                
+                await this.refreshFileTree();
+                await this.openFile(newPath);
+            } catch (e) {
+                console.error(e);
+                alert('Failed to create file: ' + e.message);
+            }
             return;
         }
-        
-        const fileName = await dialog.prompt('Enter file name:', 'untitled.json', 'New File');
-        if (!fileName) return;
-        
-        const finalName = fileName.endsWith('.json') ? fileName : fileName + '.json';
-        
-        try {
-            const emptyState = { boxes: [], arrows: [] };
-            const result = await window.electronAPI.createFile(
-                this.rootPath, 
-                finalName, 
-                JSON.stringify(emptyState, null, 2)
-            );
-            await this.refreshFileTree();
-            if (result.path) {
-                await this.openFile(result.path);
+
+        if (this.rootPath && window.electronAPI) {
+            // Local file creation
+            const fileName = await dialog.prompt('Enter file name:', 'untitled.json', 'New File');
+            if (!fileName) return;
+            
+            const finalName = fileName.endsWith('.json') ? fileName : fileName + '.json';
+            
+            try {
+                const emptyState = { boxes: [], arrows: [] };
+                // Use targetPath to allow creating in subfolders
+                const result = await window.electronAPI.createFile(
+                    targetPath, 
+                    finalName, 
+                    JSON.stringify(emptyState, null, 2)
+                );
+                await this.refreshFileTree();
+                if (result.path) {
+                    await this.openFile(result.path);
+                }
+            } catch (error) {
+                console.error('Error creating file:', error);
+                alert('Failed to create file: ' + error.message);
             }
-        } catch (error) {
-            console.error('Error creating file:', error);
-            alert('Failed to create file: ' + error.message);
+        } else {
+             if (!this.rootPath) alert('Please open a local folder first');
         }
     },
     
     async createNewFolder() {
-        if (!this.rootPath || !window.electronAPI) {
-            alert('Please open a folder first');
+        let targetPath = this.rootPath;
+        // Prioritize selected directory
+        if (this.selectedItem && this.selectedItem.isDirectory) {
+            targetPath = this.selectedItem.path;
+        }
+
+        // Handle Mesh Folder
+        if (targetPath && mesh.isMeshPath(targetPath)) {
+            const folderName = await dialog.prompt('Enter folder name:', 'new-folder', 'New Folder');
+            if (!folderName) return;
+            
+            const separator = '/';
+            const newPath = targetPath.endsWith(separator) ? targetPath + folderName : targetPath + separator + folderName;
+            
+            try {
+                await mesh.createDirectory(newPath);
+                
+                await this.refreshFileTree();
+            } catch (e) {
+                console.error(e);
+                alert('Failed to create folder: ' + e.message);
+            }
             return;
         }
-        
-        const folderName = await dialog.prompt('Enter folder name:', 'new-folder', 'New Folder');
-        if (!folderName) return;
-        
-        try {
-            await window.electronAPI.createDirectory(this.rootPath, folderName);
-            await this.refreshFileTree();
-        } catch (error) {
-            console.error('Error creating folder:', error);
-            alert('Failed to create folder: ' + error.message);
+
+        if (this.rootPath && window.electronAPI) {
+            const folderName = await dialog.prompt('Enter folder name:', 'new-folder', 'New Folder');
+            if (!folderName) return;
+            
+            try {
+                await window.electronAPI.createDirectory(targetPath, folderName);
+                await this.refreshFileTree();
+            } catch (error) {
+                console.error('Error creating folder:', error);
+                alert('Failed to create folder: ' + error.message);
+            }
+        } else {
+            if (!this.rootPath) alert('Please open a local folder first');
         }
     },
     
@@ -569,7 +806,7 @@ export const explorer = {
     },
     
     async renameSelectedFile() {
-        if (!this.selectedItem || !window.electronAPI) return;
+        if (!this.selectedItem) return;
         
         const oldPath = this.selectedItem.path;
         const oldName = this.selectedItem.name;
@@ -584,7 +821,33 @@ export const explorer = {
             this.selectedItem = null;
             return;
         }
-        
+
+        // Handle Mesh File Rename
+        if (mesh.isMeshPath(oldPath)) {
+            const separator = '/';
+            const parentPath = oldPath.substring(0, oldPath.lastIndexOf(separator));
+            const newPath = parentPath + separator + newName;
+            
+            try {
+                await mesh.renameFile(oldPath, newPath);
+
+                if (this.currentFilePath === oldPath) {
+                    this.currentFilePath = newPath;
+                    localStorage.setItem('lastOpenedFile', newPath);
+                }
+                
+                await this.refreshFileTree();
+            } catch (error) {
+                console.error('Error renaming mesh file:', error);
+                alert('Failed to rename: ' + error.message);
+            }
+            
+            document.getElementById('fileContextMenu').style.display = 'none';
+            return;
+        }
+
+        if (!window.electronAPI) return;
+
         const separator = oldPath.includes('\\') ? '\\' : '/';
         const parentPath = oldPath.substring(0, oldPath.lastIndexOf(separator));
         const newPath = parentPath + separator + newName;
@@ -607,7 +870,7 @@ export const explorer = {
     },
     
     async deleteSelectedFile() {
-        if (!this.selectedItem || !window.electronAPI) return;
+        if (!this.selectedItem) return;
         
         const confirmMsg = this.selectedItem.isDirectory
             ? `Delete folder "${this.selectedItem.name}" and all its contents?`
@@ -623,6 +886,30 @@ export const explorer = {
             this.selectedItem = null;
             return;
         }
+
+        // Handle Mesh File Delete
+        if (mesh.isMeshPath(this.selectedItem.path)) {
+            try {
+                await mesh.deletePath(this.selectedItem.path);
+                
+                if (this.currentFilePath === this.selectedItem.path) {
+                    this.currentFilePath = null;
+                    localStorage.removeItem('lastOpenedFile');
+                    explorer.room.boxes = [];
+                    explorer.room.arrows = [];
+                    explorer.room.drawAll();
+                }
+                
+                await this.refreshFileTree();
+            } catch (error) {
+                console.error('Error deleting mesh file:', error);
+                alert('Failed to delete: ' + error.message);
+            }
+            document.getElementById('fileContextMenu').style.display = 'none';
+            return;
+        }
+
+        if (!window.electronAPI) return;
         
         try {
             await window.electronAPI.deletePath(this.selectedItem.path);
@@ -630,9 +917,9 @@ export const explorer = {
             if (this.currentFilePath === this.selectedItem.path) {
                 this.currentFilePath = null;
                 localStorage.removeItem('lastOpenedFile');
-                room.boxes = [];
-                room.arrows = [];
-                room.drawAll(); // Full render when clearing canvas
+                explorer.room.boxes = [];
+                explorer.room.arrows = [];
+                explorer.room.drawAll();
             }
             
             await this.refreshFileTree();
@@ -655,7 +942,6 @@ export const explorer = {
         e.preventDefault();
         e.stopPropagation();
 
-        // Allow drop on both folders and files (to drop into parent folder)
         targetDiv.classList.add('drag-over');
         e.dataTransfer.dropEffect = 'move';
     },
@@ -670,7 +956,6 @@ export const explorer = {
         e.preventDefault();
         e.stopPropagation();
         
-        // Find the closest header in case event target is different (though pointer-events: none helps)
         const targetDiv = e.currentTarget; 
         if (targetDiv) targetDiv.classList.remove('drag-over');
 
@@ -683,20 +968,16 @@ export const explorer = {
             // Determine target directory path
             let targetDirPath = targetItem.path;
             
-            // If dropped onto a file, use its parent directory
             if (!targetItem.isDirectory) {
                 const separator = targetDirPath.includes('\\') ? '\\' : '/';
                 targetDirPath = targetDirPath.substring(0, targetDirPath.lastIndexOf(separator));
             }
             
-            // Prevent moving into self (if source is same as target file)
             if (sourceItem.path === targetItem.path) return;
             
-            // Prevent moving into same parent directory (no-op)
             const separator = sourceItem.path.includes('\\') ? '\\' : '/';
             const sourceParent = sourceItem.path.substring(0, sourceItem.path.lastIndexOf(separator));
             
-            // Normalize paths for comparison (handle potential slash differences)
             const normSourceParent = sourceParent.replace(/\\/g, '/');
             const normTargetDir = targetDirPath.replace(/\\/g, '/');
             
@@ -710,8 +991,6 @@ export const explorer = {
 
     handleContainerDragOver(e) {
         e.preventDefault();
-        // Check if we are dragging over the container background (not a tree item or its children)
-        // If we are over a tree-node, we are likely inside the tree structure, not the empty root space.
         if (!e.target.closest('.tree-node')) {
             document.getElementById('fileTree').classList.add('drag-over-container');
             e.dataTransfer.dropEffect = 'move';
@@ -732,11 +1011,7 @@ export const explorer = {
         e.preventDefault();
         document.getElementById('fileTree').classList.remove('drag-over-container');
         
-        // Only handle if dropped on the container directly (not on a child tree item)
         if (e.target.closest('.tree-item-header')) return;
-        
-        // Also avoid handling if dropped inside a tree node structure (e.g. subfolder list)
-        // We only want "empty space" to mean the root container background
         if (e.target.closest('.tree-node')) return;
         
         if (!this.rootPath) return;
@@ -749,23 +1024,17 @@ export const explorer = {
             try {
                 sourceItem = JSON.parse(data);
             } catch (err) {
-                return; // Not a valid internal drag
+                return;
             }
             
             if (!sourceItem || !sourceItem.path) return;
             
-            // Normalize everything to forward slashes first for consistent comparison
             const sourcePath = sourceItem.path.replace(/\\/g, '/');
             const rootPath = this.rootPath.replace(/\\/g, '/');
             
-            // Get parent directory of source file
-            // Handle case where path might end with slash (shouldn't for files, but maybe folders?)
             const cleanSourcePath = sourcePath.endsWith('/') ? sourcePath.slice(0, -1) : sourcePath;
             const sourceParent = cleanSourcePath.substring(0, cleanSourcePath.lastIndexOf('/'));
             
-            // If parent is root (after normalization), do nothing
-            // Compare case-insensitively for Windows? 
-            // Let's stick to exact match first, but usually casing matches if from same app.
             if (sourceParent.toLowerCase() === rootPath.toLowerCase()) {
                 return;
             }
@@ -776,13 +1045,96 @@ export const explorer = {
         }
     },
 
+    async acquireLock(item, releaseItems = []) {
+        if (!this.currentFilePath) return { success: true };
+        
+        // Handle lock acquisition for Mesh files
+        if (mesh.isMeshPath(this.currentFilePath)) {
+            try {
+                // Process Release Items
+                if (releaseItems && releaseItems.length > 0) {
+                    for (const releaseItem of releaseItems) {
+                        const releaseId = releaseItem.id; // Ensure items have IDs
+                        if (!releaseId) continue;
+                        
+                        await mesh.releaseLock(this.currentFilePath, releaseId, explorer.room.userId);
+                        releaseItem.acquired = null;
+                    }
+                }
+
+                if (!item) return { success: true };
+                
+                // Acquire Lock
+                const itemId = item.id;
+                if (!itemId) {
+                    console.warn('Item has no ID, cannot acquire lock', item);
+                    return { success: true }; // Should this fail?
+                }
+
+                const res = await mesh.acquireLock(this.currentFilePath, itemId, explorer.room.userId);
+
+                if (res.ok) {
+                    item.acquired = explorer.room.userId;
+                    return { success: true };
+                } else {
+                    // Lock acquisition failed (likely held by another user)
+                    // We might want to know who has it. 
+                    // The current backend just returns 409 Conflict.
+                    // To get who has it, we would need to query /locks or update the 409 response.
+                    // For now, let's just assume it's locked by someone else.
+                    // Ideally, we should fetch the lock info to update the UI.
+                    
+                    // Optimistic update: we don't know who has it, but we know we don't.
+                    // We could poll /locks to find out.
+                    return { success: false, acquiredBy: null }; 
+                }
+                
+            } catch (e) {
+                console.error('Lock acquisition failed:', e);
+                return { success: false, error: e };
+            }
+        }
+        
+        return { success: true };
+    },
+
     async moveFile(sourceItem, targetDirPath) {
+        // Handle Mesh Move
+        if (mesh.isMeshPath(sourceItem.path)) {
+            // Ensure target is also mesh
+            if (!mesh.isMeshPath(targetDirPath)) {
+                alert('Cannot move mesh file to local system directly.');
+                return;
+            }
+
+            const separator = '/';
+            // Ensure targetDirPath does not end with separator
+            const cleanTarget = targetDirPath.endsWith(separator) ? targetDirPath.slice(0, -1) : targetDirPath;
+            const newPath = cleanTarget + separator + sourceItem.name;
+
+            if (sourceItem.path === newPath) return;
+
+            try {
+                await mesh.renameFile(sourceItem.path, newPath);
+
+                if (this.currentFilePath === sourceItem.path) {
+                    this.currentFilePath = newPath;
+                    localStorage.setItem('lastOpenedFile', newPath);
+                }
+
+                await this.refreshFileTree();
+            } catch (error) {
+                console.error('Move error:', error);
+                alert('Failed to move file: ' + error.message);
+            }
+            return;
+        }
+
         if (!window.electronAPI) return;
 
         const separator = targetDirPath.includes('\\') ? '\\' : '/';
         const newPath = targetDirPath + separator + sourceItem.name;
 
-        // Prevent moving to same location
         if (sourceItem.path === newPath) return;
 
         try {

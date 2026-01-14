@@ -1,5 +1,5 @@
 /* Modals */
-#exportModal, #promptDialog, #customTagDialog {
+#promptDialog, #customTagDialog {
     position: fixed;
     top: 0;
     left: 0;
@@ -12,7 +12,7 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-#exportModalOverlay, #promptDialogOverlay, #customTagDialogOverlay {
+#promptDialogOverlay, #customTagDialogOverlay {
     position: absolute;
     top: 0;
     left: 0;
@@ -22,7 +22,7 @@
     backdrop-filter: blur(5px);
 }
 
-#exportModalContent, #promptDialogContent, #customTagDialogContent {
+#promptDialogContent, #customTagDialogContent {
     position: relative;
     background: #ffffff;
     border-radius: 12px;
@@ -45,34 +45,34 @@
     }
 }
 
-#exportModalHeader, #promptDialogHeader, #customTagDialogHeader {
+#promptDialogHeader, #customTagDialogHeader {
     padding: 16px 20px 12px;
     background: transparent;
     text-align: center;
 }
 
-#exportModalTitle, #promptDialogTitle, #customTagDialogTitle {
+#promptDialogTitle, #customTagDialogTitle {
     margin: 0;
     font-size: 15px;
     font-weight: 600;
     color: #333;
 }
 
-#exportModalBody, #promptDialogBody, #customTagDialogBody {
+#promptDialogBody, #customTagDialogBody {
     padding: 0 20px 20px;
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
 
-#exportModalBody label, #promptDialogBody label, #customTagDialogBody label {
+#promptDialogBody label, #customTagDialogBody label {
     font-size: 13px;
     color: #666;
     font-weight: 400;
     margin-bottom: -4px;
 }
 
-#exportModalBody input, #promptDialogBody input, #customTagDialogBody input {
+#promptDialogBody input, #customTagDialogBody input {
     padding: 8px 10px;
     border: 1px solid #d1d1d1;
     border-radius: 6px;
@@ -83,7 +83,7 @@
     background: #f9f9f9;
 }
 
-#exportModalBody input:focus, #promptDialogBody input:focus, #customTagDialogBody input:focus {
+#promptDialogBody input:focus, #customTagDialogBody input:focus {
     border-color: #007aff;
     background: #fff;
     box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
@@ -106,39 +106,7 @@
     flex: 1;
 }
 
-#exportDirectoryContainer {
-    display: flex;
-    gap: 8px;
-}
-
-#exportFileDirectory {
-    flex: 1;
-    background: #f9f9f9;
-    padding: 8px 10px;
-    border: 1px solid #d1d1d1;
-    border-radius: 6px;
-    font-size: 13px;
-    color: #666;
-    cursor: default;
-}
-
-#exportSelectDirectory {
-    padding: 0 12px;
-    background: #fff;
-    border: 1px solid #d1d1d1;
-    border-radius: 6px;
-    color: #333;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-#exportSelectDirectory:hover {
-    background: #f3f3f3;
-}
-
-#exportModalFooter, #promptDialogFooter, #customTagDialogFooter {
+#promptDialogFooter, #customTagDialogFooter {
     padding: 12px 20px 16px;
     background: transparent;
     display: flex;
@@ -146,7 +114,7 @@
     gap: 10px;
 }
 
-#exportModalFooter button, #promptDialogFooter button, #customTagDialogFooter button {
+#promptDialogFooter button, #customTagDialogFooter button {
     padding: 6px 14px;
     border-radius: 6px;
     font-size: 13px;
@@ -156,22 +124,22 @@
     border: none;
 }
 
-#exportModalCancel, #promptDialogCancel, #customTagDialogCancel {
+#promptDialogCancel, #customTagDialogCancel {
     background: #f3f3f3;
     color: #333;
 }
 
-#exportModalCancel:hover, #promptDialogCancel:hover, #customTagDialogCancel:hover {
+#promptDialogCancel:hover, #customTagDialogCancel:hover {
     background: #e6e6e6;
 }
 
-#exportModalConfirm, #promptDialogConfirm, #customTagDialogConfirm {
+#promptDialogConfirm, #customTagDialogConfirm {
     background: #007aff;
     color: #ffffff;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-#exportModalConfirm:hover, #promptDialogConfirm:hover, #customTagDialogConfirm:hover {
+#promptDialogConfirm:hover, #customTagDialogConfirm:hover {
     background: #0069d9;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
