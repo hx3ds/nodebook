@@ -18,11 +18,25 @@
     <div id="sidebarContainer">
         <div id="sidebar">
             <div id="sidebarHeader">
-                <div id="sidebarTitle">EXPLORER</div>
+                <div id="sidebarTitle"></div>
                 <div id="sidebarActions">
                     <button id="openFolderBtn" title="Open Folder">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h4.5c.625 0 1.25.196 1.768.558l.864.654c.518.362 1.142.558 1.768.558H19.5A2.25 2.25 0 0121.75 6v3.776" />
+                        </svg>
+                    </button>
+                    <button id="snapshotBtn" title="Create Snapshot">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5h10.5a2.25 2.25 0 012.25 2.25v7.5A2.25 2.25 0 0117.25 19.5H6.75A2.25 2.25 0 014.5 17.25v-7.5A2.25 2.25 0 016.75 7.5z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 7.5l.5-1.5h5L15 7.5" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.125a2.625 2.625 0 100-5.25 2.625 2.625 0 000 5.25z" />
+                        </svg>
+                    </button>
+                    <button id="snapshotHistoryBtn" title="Snapshot History">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12a8.25 8.25 0 111.723 5.034" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12v3.75h3.75" />
                         </svg>
                     </button>
                     <button id="newFileBtn" title="New Note">
@@ -173,6 +187,27 @@
                 <button id="customTagDialogRemove" class="danger-btn" style="display: none;">Remove Tag</button>
                 <button id="customTagDialogCancel">Cancel</button>
                 <button id="customTagDialogConfirm">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="snapshotHistoryDialog" style="display: none;">
+        <div id="snapshotHistoryDialogOverlay"></div>
+        <div id="snapshotHistoryDialogContent">
+            <div id="snapshotHistoryDialogHeader">
+                <h3 id="snapshotHistoryDialogTitle">Snapshots</h3>
+            </div>
+            <div id="snapshotHistoryDialogBody">
+                <div id="snapshotHistoryMeta"></div>
+                <div id="snapshotHistorySettings">
+                    <label id="snapshotMaxLabel" for="snapshotMaxInput">Max snapshots</label>
+                    <input id="snapshotMaxInput" type="number" min="1" max="500" step="1">
+                    <button id="snapshotMaxApplyBtn">Apply</button>
+                </div>
+                <div id="snapshotHistoryList"></div>
+            </div>
+            <div id="snapshotHistoryDialogFooter">
+                <button id="snapshotHistoryDialogClose">Close</button>
             </div>
         </div>
     </div>

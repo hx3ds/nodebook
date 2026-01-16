@@ -53,5 +53,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
         const subscription = (_event, data) => callback(data);
         ipcRenderer.on('process-event', subscription);
     },
-    removeAllProcessListeners: () => ipcRenderer.removeAllListeners('process-event')
+    removeAllProcessListeners: () => ipcRenderer.removeAllListeners('process-event'),
+
+    createSnapshot: (folderPath) => ipcRenderer.invoke('snapshot-create', folderPath),
+    listSnapshots: (folderPath) => ipcRenderer.invoke('snapshot-list', folderPath),
+    getSnapshotConfig: (folderPath) => ipcRenderer.invoke('snapshot-get-config', folderPath),
+    setSnapshotConfig: (folderPath, config) => ipcRenderer.invoke('snapshot-set-config', folderPath, config),
+    deleteSnapshot: (folderPath, snapshotId) => ipcRenderer.invoke('snapshot-delete', folderPath, snapshotId),
+    restoreSnapshot: (folderPath, snapshotId) => ipcRenderer.invoke('snapshot-restore', folderPath, snapshotId),
+    updateSnapshot: (folderPath, snapshotId, patch) => ipcRenderer.invoke('snapshot-update', folderPath, snapshotId, patch)
 });

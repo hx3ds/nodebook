@@ -17,9 +17,13 @@ export const explorer = {
     currentFilePath: null,
     expandedFolders: new Set(),
     saveDebounceTimer: null,
+    isCreatingSnapshot: false,
+    snapshotModalListenersAttached: false,
     
     async init() {
         const openFolderBtn = document.getElementById('openFolderBtn');
+        const snapshotBtn = document.getElementById('snapshotBtn');
+        const snapshotHistoryBtn = document.getElementById('snapshotHistoryBtn');
         const newFileBtn = document.getElementById('newFileBtn');
         const newFolderBtn = document.getElementById('newFolderBtn');
         const fileMenuOpen = document.getElementById('fileMenuOpen');
@@ -30,6 +34,16 @@ export const explorer = {
         if (openFolderBtn) {
             openFolderBtn.addEventListener('click', () => {
                 this.openFolder();
+            });
+        }
+        if (snapshotBtn) {
+            snapshotBtn.addEventListener('click', () => {
+                this.createSnapshot();
+            });
+        }
+        if (snapshotHistoryBtn) {
+            snapshotHistoryBtn.addEventListener('click', () => {
+                this.openSnapshotHistory();
             });
         }
         if (newFileBtn) {
@@ -121,6 +135,7 @@ export const explorer = {
         
         // Initialize sidebar resize handler
         this.setupSidebarResizer();
+        this.setupSnapshotHistoryModal();
         
         // Restore sidebar collapsed state
         const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
@@ -160,6 +175,264 @@ export const explorer = {
                 explorer.saveCurrentFile(immediate);
             }
         };
+    },
+
+    setupSnapshotHistoryModal() {
+        if (this.snapshotModalListenersAttached) return;
+
+        const dialogEl = document.getElementById('snapshotHistoryDialog');
+        const overlayEl = document.getElementById('snapshotHistoryDialogOverlay');
+        const closeBtn = document.getElementById('snapshotHistoryDialogClose');
+        const applyBtn = document.getElementById('snapshotMaxApplyBtn');
+
+        if (!dialogEl || !overlayEl || !closeBtn) return;
+
+        const hide = () => {
+            dialogEl.style.display = 'none';
+        };
+
+        closeBtn.addEventListener('click', hide);
+        overlayEl.addEventListener('click', hide);
+        document.addEventListener('keydown', (e) => {
+            if (dialogEl.style.display !== 'flex') return;
+            if (e.key === 'Escape') hide();
+        });
+
+        if (applyBtn) {
+            applyBtn.addEventListener('click', () => this.applySnapshotMaxSetting());
+        }
+
+        this.snapshotModalListenersAttached = true;
+    },
+
+    async createSnapshot() {
+        if (!window.electronAPI || !window.electronAPI.createSnapshot) {
+            alert('Snapshots are only available in the desktop application');
+            return;
+        }
+
+        if (!this.rootPath || mesh.isMeshPath(this.rootPath)) {
+            alert('Please open a local folder first');
+            return;
+        }
+
+        if (this.isCreatingSnapshot) return;
+
+        const label = await dialog.prompt('Snapshot name:', '', 'Create Snapshot');
+        if (label === null) return;
+
+        this.isCreatingSnapshot = true;
+        const snapshotBtn = document.getElementById('snapshotBtn');
+        if (snapshotBtn) {
+            snapshotBtn.disabled = true;
+            snapshotBtn.style.opacity = '0.6';
+        }
+
+        try {
+            const snapshot = await window.electronAPI.createSnapshot(this.rootPath);
+            if (snapshot && snapshot.id && window.electronAPI.updateSnapshot) {
+                const trimmed = (label || '').trim();
+                if (trimmed) {
+                    await window.electronAPI.updateSnapshot(this.rootPath, snapshot.id, { label: trimmed });
+                }
+            }
+            alert('Snapshot created');
+        } catch (error) {
+            console.error('Error creating snapshot:', error);
+            alert('Failed to create snapshot: ' + (error && error.message ? error.message : 'Unknown error'));
+        } finally {
+            this.isCreatingSnapshot = false;
+            if (snapshotBtn) {
+                snapshotBtn.disabled = false;
+                snapshotBtn.style.opacity = '';
+            }
+        }
+    },
+
+    async openSnapshotHistory() {
+        if (!window.electronAPI || !window.electronAPI.listSnapshots) {
+            alert('Snapshots are only available in the desktop application');
+            return;
+        }
+
+        if (!this.rootPath || mesh.isMeshPath(this.rootPath)) {
+            alert('Please open a local folder first');
+            return;
+        }
+
+        const dialogEl = document.getElementById('snapshotHistoryDialog');
+        const metaEl = document.getElementById('snapshotHistoryMeta');
+        if (!dialogEl) return;
+
+        if (metaEl) metaEl.textContent = this.rootPath;
+        dialogEl.style.display = 'flex';
+
+        await this.loadSnapshotMaxSetting();
+        await this.refreshSnapshotHistoryList();
+    },
+
+    async loadSnapshotMaxSetting() {
+        const input = document.getElementById('snapshotMaxInput');
+        if (!input) return;
+
+        if (!window.electronAPI || !window.electronAPI.getSnapshotConfig) return;
+
+        try {
+            const config = await window.electronAPI.getSnapshotConfig(this.rootPath);
+            if (config && Number.isFinite(config.maxSnapshots)) {
+                input.value = String(config.maxSnapshots);
+            }
+        } catch (e) {
+            console.error('Error loading snapshot config:', e);
+        }
+    },
+
+    async applySnapshotMaxSetting() {
+        const input = document.getElementById('snapshotMaxInput');
+        const applyBtn = document.getElementById('snapshotMaxApplyBtn');
+        if (!input) return;
+
+        const parsed = parseInt(input.value, 10);
+        if (!Number.isFinite(parsed) || parsed < 1 || parsed > 500) {
+            alert('Max snapshots must be between 1 and 500');
+            return;
+        }
+
+        if (!window.electronAPI || !window.electronAPI.setSnapshotConfig) return;
+
+        if (applyBtn) {
+            applyBtn.disabled = true;
+            applyBtn.style.opacity = '0.7';
+        }
+
+        try {
+            await window.electronAPI.setSnapshotConfig(this.rootPath, { maxSnapshots: parsed });
+            await this.refreshSnapshotHistoryList();
+        } catch (e) {
+            console.error('Error saving snapshot config:', e);
+            alert('Failed to save max snapshots: ' + (e && e.message ? e.message : 'Unknown error'));
+        } finally {
+            if (applyBtn) {
+                applyBtn.disabled = false;
+                applyBtn.style.opacity = '';
+            }
+        }
+    },
+
+    formatSnapshotTime(ts) {
+        const d = new Date(ts);
+        if (Number.isNaN(d.getTime())) return '';
+        return d.toLocaleString();
+    },
+
+    async refreshSnapshotHistoryList() {
+        const listEl = document.getElementById('snapshotHistoryList');
+        if (!listEl) return;
+
+        listEl.innerHTML = '';
+
+        let snapshots = [];
+        try {
+            snapshots = await window.electronAPI.listSnapshots(this.rootPath);
+        } catch (e) {
+            console.error('Error listing snapshots:', e);
+            const row = document.createElement('div');
+            row.className = 'snapshot-row';
+            row.textContent = 'Failed to load snapshots';
+            listEl.appendChild(row);
+            return;
+        }
+
+        if (!snapshots || snapshots.length === 0) {
+            const row = document.createElement('div');
+            row.className = 'snapshot-row';
+            row.textContent = 'No snapshots yet';
+            listEl.appendChild(row);
+            return;
+        }
+
+        for (const snap of snapshots) {
+            const row = document.createElement('div');
+            row.className = 'snapshot-row';
+
+            const left = document.createElement('div');
+            left.className = 'snapshot-row-left';
+
+            const title = document.createElement('div');
+            title.className = 'snapshot-row-title';
+            title.textContent = snap.label && snap.label.trim() ? snap.label : (snap.folderName ? snap.folderName : 'Snapshot');
+
+            const subtitle = document.createElement('div');
+            subtitle.className = 'snapshot-row-subtitle';
+            subtitle.textContent = this.formatSnapshotTime(snap.createdAt);
+
+            left.appendChild(title);
+            left.appendChild(subtitle);
+
+            const actions = document.createElement('div');
+            actions.className = 'snapshot-row-actions';
+
+            const renameBtn = document.createElement('button');
+            renameBtn.className = 'snapshot-action-btn';
+            renameBtn.textContent = 'Rename';
+            renameBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const next = await dialog.prompt('Snapshot name:', snap.label || '', 'Rename Snapshot');
+                if (next === null) return;
+                const trimmed = (next || '').trim();
+                try {
+                    await window.electronAPI.updateSnapshot(this.rootPath, snap.id, { label: trimmed });
+                    await this.refreshSnapshotHistoryList();
+                } catch (err) {
+                    console.error('Rename snapshot failed:', err);
+                    alert('Failed to rename snapshot: ' + (err && err.message ? err.message : 'Unknown error'));
+                }
+            });
+
+            const restoreBtn = document.createElement('button');
+            restoreBtn.className = 'snapshot-action-btn';
+            restoreBtn.textContent = 'Restore';
+            restoreBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const ok = await dialog.confirm('Restore this snapshot into a new folder next to the current folder?', 'Restore Snapshot');
+                if (!ok) return;
+                try {
+                    const result = await window.electronAPI.restoreSnapshot(this.rootPath, snap.id);
+                    if (result && result.restoredPath) {
+                        alert('Restored to: ' + result.restoredPath);
+                    } else {
+                        alert('Snapshot restored');
+                    }
+                } catch (err) {
+                    console.error('Restore snapshot failed:', err);
+                    alert('Failed to restore snapshot: ' + (err && err.message ? err.message : 'Unknown error'));
+                }
+            });
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'snapshot-action-btn snapshot-action-danger';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const ok = await dialog.confirm('Delete this snapshot? This cannot be undone.', 'Delete Snapshot');
+                if (!ok) return;
+                try {
+                    await window.electronAPI.deleteSnapshot(this.rootPath, snap.id);
+                    await this.refreshSnapshotHistoryList();
+                } catch (err) {
+                    console.error('Delete snapshot failed:', err);
+                    alert('Failed to delete snapshot: ' + (err && err.message ? err.message : 'Unknown error'));
+                }
+            });
+
+            actions.appendChild(renameBtn);
+            actions.appendChild(restoreBtn);
+            actions.appendChild(deleteBtn);
+
+            row.appendChild(left);
+            row.appendChild(actions);
+            listEl.appendChild(row);
+        }
     },
     
     setupSidebarResizer() {
@@ -299,6 +572,7 @@ export const explorer = {
             });
             
             for (const item of items) {
+                if (item && item.isDirectory && item.name === '.nodebook') continue;
                 const itemEl = this.createTreeItem(item, level);
                 container.appendChild(itemEl);
             }
@@ -496,9 +770,8 @@ export const explorer = {
             document.getElementById('fileMenuRename').style.display = 'none';
             document.getElementById('fileMenuDelete').style.display = 'none';
         }
-        
-        const divider = menu.querySelector('.menu-divider');
-        if (divider) divider.style.display = 'block';
+
+        this.updateFileContextMenuDividers(menu);
         
         if (explorer.room && explorer.room.adjustMenuPosition) {
             explorer.room.adjustMenuPosition(menu, e.clientX, e.clientY);
@@ -524,8 +797,7 @@ export const explorer = {
         document.getElementById('fileMenuOpen').style.display = 'none';
         document.getElementById('fileMenuRename').style.display = 'none';
         document.getElementById('fileMenuDelete').style.display = 'none';
-        const divider = menu.querySelector('.menu-divider');
-        if (divider) divider.style.display = 'none';
+        this.updateFileContextMenuDividers(menu);
         
         if (explorer.room && explorer.room.adjustMenuPosition) {
             explorer.room.adjustMenuPosition(menu, e.clientX, e.clientY);
@@ -533,6 +805,49 @@ export const explorer = {
             menu.style.display = 'block';
             menu.style.left = e.clientX + 'px';
             menu.style.top = e.clientY + 'px';
+        }
+    },
+
+    isContextMenuItemVisible(el) {
+        if (!el) return false;
+        return getComputedStyle(el).display !== 'none';
+    },
+
+    updateFileContextMenuDividers(menu) {
+        if (!menu) return;
+
+        const children = Array.from(menu.children);
+
+        const isActionable = (el) => {
+            if (!el) return false;
+            if (el.tagName === 'BUTTON') return true;
+            return el.classList.contains('menu-item-with-submenu');
+        };
+
+        for (const el of children) {
+            if (!el.classList.contains('menu-divider')) continue;
+
+            let hasPrev = false;
+            for (let i = children.indexOf(el) - 1; i >= 0; i--) {
+                const prev = children[i];
+                if (!isActionable(prev)) continue;
+                if (this.isContextMenuItemVisible(prev)) {
+                    hasPrev = true;
+                    break;
+                }
+            }
+
+            let hasNext = false;
+            for (let i = children.indexOf(el) + 1; i < children.length; i++) {
+                const next = children[i];
+                if (!isActionable(next)) continue;
+                if (this.isContextMenuItemVisible(next)) {
+                    hasNext = true;
+                    break;
+                }
+            }
+
+            el.style.display = (hasPrev && hasNext) ? 'block' : 'none';
         }
     },
     
