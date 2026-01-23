@@ -92,6 +92,7 @@
             <div class="menu-divider"></div>
         </div>
         <button id="roomMenuResetPosition" onclick="projection.resetPan()">Reset Media Position</button>
+        <button id="roomMenuResetZoom" onclick="room.resetZoom()">Reset Zoom <span class="menu-shortcut">Ctrl+0</span></button>
         <button id="roomMenuToggleSidebar" onclick="room.toggleSidebar()">Hide Sidebar</button>
         <button id="roomMenuToggleControls" onclick="room.toggleControls()">Toggle Controls</button>
         <button id="roomMenuResetOverlay" onclick="control.resetPosition()">Reset Controls Position</button>
@@ -215,7 +216,9 @@
     <div id="projection-layer"></div>
     
     <div id="room">
-        <svg id="arrowSpace"></svg>
+        <div id="containerSpace">
+            <svg id="arrowSpace"></svg>
+        </div>
     </div>
 
     <div id="panel-layer"></div>

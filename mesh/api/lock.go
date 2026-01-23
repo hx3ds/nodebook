@@ -2,7 +2,7 @@ package api
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"mesh/ws"
 	"net/http"
 	"sync"
@@ -55,7 +55,7 @@ func (lm *LockManager) Acquire(path, itemId, clientId string, duration time.Dura
 	}
 	lm.locks[key] = lockInfo
 
-	log.Printf("Lock acquired: User=%s Path=%s ItemID=%s", clientId, path, itemId)
+	slog.Info("Lock acquired", "clientId", clientId, "path", path, "itemId", itemId)
 
 	// Broadcast
 	if lm.hub != nil {
@@ -82,7 +82,7 @@ func (lm *LockManager) Release(path, itemId, clientId string) {
 		if lock.ClientID == clientId {
 			delete(lm.locks, key)
 
-			log.Printf("Lock released: User=%s Path=%s ItemID=%s", clientId, path, itemId)
+			slog.Info("Lock released", "clientId", clientId, "path", path, "itemId", itemId)
 
 			// Broadcast
 			if lm.hub != nil {

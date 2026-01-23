@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"math/rand"
 	"mesh/config"
 	"mesh/db"
@@ -103,7 +103,7 @@ func (h *AuthHandler) HandleTelegramLogin(w http.ResponseWriter, r *http.Request
 
 		if shouldUpdate {
 			if err := h.DB.UpdateUser(ctx, user); err != nil {
-				log.Printf("Failed to update user: %v", err)
+				slog.Warn("Failed to update user", "err", err)
 			}
 		}
 	}
@@ -184,13 +184,13 @@ func (h *AuthHandler) HandleEmailLoginRequest(w http.ResponseWriter, r *http.Req
 	code := fmt.Sprintf("%06d", rand.Intn(1000000))
 	if err := h.DB.SaveEmailCode(r.Context(), req.Email, code, 15*time.Minute); err != nil {
 		http.Error(w, "Failed to save code", http.StatusInternalServerError)
-		log.Printf("SaveEmailCode error: %v", err)
+		slog.Error("SaveEmailCode failed", "err", err)
 		return
 	}
 
 	if err := h.sendEmail(req.Email, code); err != nil {
 		http.Error(w, "Failed to send email", http.StatusInternalServerError)
-		log.Printf("SendEmail error: %v", err)
+		slog.Error("SendEmail failed", "err", err)
 		return
 	}
 

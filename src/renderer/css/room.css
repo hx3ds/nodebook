@@ -17,16 +17,25 @@
     background-repeat: no-repeat;
 }
 
-#arrowSpace {
-    position: fixed;
+#containerSpace {
+    position: absolute;
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
+    transform-origin: 0 0;
+}
+
+#arrowSpace {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     background: transparent;
     pointer-events: none;
     z-index: 20;
-    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: visible;
 }
 
 #arrowSpace path {
@@ -144,6 +153,11 @@ g.locked-by-other path {
     width: fit-content;
     height: fit-content;
     box-sizing: border-box;
+}
+
+#room.word-wrap .box-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 .box-text:focus {

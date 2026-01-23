@@ -19,6 +19,7 @@ export const explorer = {
     saveDebounceTimer: null,
     isCreatingSnapshot: false,
     snapshotModalListenersAttached: false,
+    hideDotItems: true,
     
     async init() {
         const openFolderBtn = document.getElementById('openFolderBtn');
@@ -554,6 +555,12 @@ export const explorer = {
         container.appendChild(el);
     },
 
+    shouldHideItem(item) {
+        if (!this.hideDotItems) return false;
+        const name = item && typeof item.name === 'string' ? item.name : '';
+        return name.startsWith('.');
+    },
+
     async renderDirectory(dirPath, container, level) {
         if (mesh.isMeshPath(dirPath)) {
             return this.renderMeshDirectory(dirPath, container, level);
@@ -572,7 +579,7 @@ export const explorer = {
             });
             
             for (const item of items) {
-                if (item && item.isDirectory && item.name === '.nodebook') continue;
+                if (this.shouldHideItem(item)) continue;
                 const itemEl = this.createTreeItem(item, level);
                 container.appendChild(itemEl);
             }
@@ -592,6 +599,7 @@ export const explorer = {
             });
             
             for (const item of items) {
+                if (this.shouldHideItem(item)) continue;
                 const itemEl = this.createTreeItem(item, level);
                 container.appendChild(itemEl);
             }

@@ -11,7 +11,15 @@ export const room = {
     visible: true,
 
     element: null,
+    containerSpaceElement: null,
+    arrowSpaceElement: null,
     offset: { x: 0, y: 0 },
+    zoom: 1,
+    minZoom: 0.2,
+    maxZoom: 4,
+    zoomFactorStep: 1.1,
+    _zoomEpsilon: 0.0001,
+    _viewStatePersistTimer: null,
 
     previewConnection: null,
     previewSelection: { connectionLine: null, selectionRect: null },
@@ -36,6 +44,7 @@ export const room = {
     lastPanPos: { x: 0, y: 0 },
 
     userId: null, // Initialized in init()
+    boxWordWrapEnabled: false,
     
     // Double click detection
     lastClickTime: 0,
@@ -261,16 +270,105 @@ export const room = {
                 if (parsed && parsed.offset) {
                     this.offset = parsed.offset;
                 }
+                if (parsed && Number.isFinite(parsed.zoom)) {
+                    this.zoom = this._clampZoom(parsed.zoom);
+                } else {
+                    this.zoom = 1;
+                }
             } catch (e) {
                 console.error('Failed to load local state', e);
             }
         } else {
             this.offset = { x: 0, y: 0 };
+            this.zoom = 1;
         }
 
         this._getRoomContext(nextKey);
         this._touchRoomKey(nextKey);
+        this.applyViewTransform();
         return true;
+    },
+
+    _clampZoom(value) {
+        if (!Number.isFinite(value)) return 1;
+        return Math.max(this.minZoom, Math.min(this.maxZoom, value));
+    },
+
+    _getViewportAnchorClientPos() {
+        if (!this.element) {
+            return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        }
+        const rect = this.element.getBoundingClientRect();
+        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    },
+
+    _scheduleViewStatePersist() {
+        if (this._viewStatePersistTimer) {
+            clearTimeout(this._viewStatePersistTimer);
+        }
+        this._viewStatePersistTimer = setTimeout(() => {
+            this._viewStatePersistTimer = null;
+            const roomKey = this._activeRoomKey || this.getActiveRoomKey();
+            this._safeSetItem(
+                this._getRoomStorageKey('nodeLocalState', roomKey),
+                JSON.stringify({ offset: room.offset, zoom: room.zoom })
+            );
+            this._touchRoomKey(roomKey);
+        }, 200);
+    },
+
+    applyViewTransform() {
+        if (!this.containerSpaceElement) return;
+        this.containerSpaceElement.style.transform = `translate(${this.offset.x}px, ${this.offset.y}px) scale(${this.zoom})`;
+    },
+
+    loadBoxWordWrapSetting() {
+        this.boxWordWrapEnabled = localStorage.getItem('nodeBoxWordWrap') === 'true';
+        this.applyBoxWordWrapSetting();
+    },
+
+    applyBoxWordWrapSetting(enabled) {
+        if (enabled !== undefined) {
+            this.boxWordWrapEnabled = !!enabled;
+        }
+        if (!this.element) return;
+        this.element.classList.toggle('word-wrap', !!this.boxWordWrapEnabled);
+    },
+
+    _setZoom(newZoom, clientX, clientY) {
+        const nextZoom = this._clampZoom(newZoom);
+        if (Math.abs(nextZoom - this.zoom) < this._zoomEpsilon) {
+            return;
+        }
+
+        const rect = this.element ? this.element.getBoundingClientRect() : { left: 0, top: 0 };
+        const anchorX = (clientX ?? 0) - rect.left;
+        const anchorY = (clientY ?? 0) - rect.top;
+
+        const containerX = (anchorX - this.offset.x) / this.zoom;
+        const containerY = (anchorY - this.offset.y) / this.zoom;
+
+        this.offset.x = anchorX - containerX * nextZoom;
+        this.offset.y = anchorY - containerY * nextZoom;
+        this.zoom = nextZoom;
+
+        this.applyViewTransform();
+        this._scheduleViewStatePersist();
+    },
+
+    zoomIn(clientX, clientY) {
+        const anchor = (clientX === undefined || clientY === undefined) ? this._getViewportAnchorClientPos() : { x: clientX, y: clientY };
+        this._setZoom(this.zoom * this.zoomFactorStep, anchor.x, anchor.y);
+    },
+
+    zoomOut(clientX, clientY) {
+        const anchor = (clientX === undefined || clientY === undefined) ? this._getViewportAnchorClientPos() : { x: clientX, y: clientY };
+        this._setZoom(this.zoom / this.zoomFactorStep, anchor.x, anchor.y);
+    },
+
+    resetZoom(clientX, clientY) {
+        const anchor = (clientX === undefined || clientY === undefined) ? this._getViewportAnchorClientPos() : { x: clientX, y: clientY };
+        this._setZoom(1, anchor.x, anchor.y);
     },
 
     _ensureHistoryBaseline(loadedState) {
@@ -340,11 +438,14 @@ export const room = {
         this.updateUserId();
 
         this.element = document.getElementById('room');
+        this.containerSpaceElement = document.getElementById('containerSpace');
         this.arrowSpaceElement = document.getElementById('arrowSpace');
+        this.loadBoxWordWrapSetting();
         this.loadTagNames();
         this.setupEventListeners();
         this.setupSubmenuHandlers();
         this._syncActiveRoomContext();
+        this.applyViewTransform();
 
         this.pushHistory(); // Initial state
         
@@ -1183,8 +1284,6 @@ export const room = {
 
     findArrowAt(pos) {
         const { x, y } = pos;
-        const adjustedX = x + room.offset.x;
-        const adjustedY = y + room.offset.y;
         
         // Get all arrow group elements from the SVG
         const arrowGroups = this.arrowSpaceElement.querySelectorAll('g[data-arrow-id]');
@@ -1196,8 +1295,8 @@ export const room = {
             
             // Create an SVG point for hit testing
             const svgPoint = this.arrowSpaceElement.createSVGPoint();
-            svgPoint.x = adjustedX;
-            svgPoint.y = adjustedY;
+            svgPoint.x = x;
+            svgPoint.y = y;
             
             // Check if point is in the stroke with tolerance
             if (pathElement.isPointInStroke && pathElement.isPointInStroke(svgPoint)) {
@@ -1213,6 +1312,7 @@ export const room = {
         this.element.addEventListener('mousemove', handlers.handleMouseMove);
         this.element.addEventListener('mouseup', handlers.handleMouseUp);
         this.element.addEventListener('mouseleave', handlers.handleMouseLeave);
+        this.element.addEventListener('wheel', handlers.handleWheel, { passive: false });
 
         this.element.addEventListener('contextmenu', handlers.handleContextMenu);
         document.addEventListener('keydown', handlers.handleKeyDown);
@@ -1357,8 +1457,8 @@ export const room = {
         }
         const rect = room.element.getBoundingClientRect();
         return {
-            x: (e.clientX - rect.left) - room.offset.x,
-            y: (e.clientY - rect.top) - room.offset.y
+            x: ((e.clientX - rect.left) - room.offset.x) / room.zoom,
+            y: ((e.clientY - rect.top) - room.offset.y) / room.zoom
         };
     },
 
@@ -1538,12 +1638,16 @@ export const room = {
             tooltip.style.display = 'block';
         }
         
-        if (box.maximized) {
+        if (box.element) {
+            const rect = box.element.getBoundingClientRect();
+            tooltip.style.left = (rect.left + 20) + 'px';
+            tooltip.style.top = (rect.top + 6) + 'px';
+        } else if (box.maximized) {
             tooltip.style.left = '23px';
             tooltip.style.top = '9px';
         } else {
-            tooltip.style.left = (box.x + room.offset.x + 20) + 'px';
-            tooltip.style.top = (box.y + room.offset.y + 6) + 'px';
+            tooltip.style.left = (box.x * room.zoom + room.offset.x + 20) + 'px';
+            tooltip.style.top = (box.y * room.zoom + room.offset.y + 6) + 'px';
         }
     },
 
@@ -1584,8 +1688,8 @@ export const room = {
                 boxDiv.setAttribute('data-acquired-by', box.acquired);
             }
 
-            boxDiv.style.left = (box.x + room.offset.x) + 'px';
-            boxDiv.style.top = (box.y + room.offset.y) + 'px';
+            boxDiv.style.left = box.x + 'px';
+            boxDiv.style.top = box.y + 'px';
             boxDiv.style.width = box.width + 'px';
             boxDiv.style.height = box.height + 'px';
             boxDiv.owner = box;
@@ -1697,8 +1801,8 @@ export const room = {
                 boxDiv.appendChild(linkIcon);
             }
 
-            const roomDiv = room.element;
-            roomDiv.appendChild(boxDiv);
+            const parent = box.maximized ? room.element : (room.containerSpaceElement || room.element);
+            parent.appendChild(boxDiv);
 
         } else {
             const boxDiv = box.element;
@@ -1724,19 +1828,27 @@ export const room = {
             }
 
             if (box.maximized) {
+                if (room.element && boxDiv.parentNode !== room.element) {
+                    room.element.appendChild(boxDiv);
+                }
                 if (boxDiv.style.position !== 'fixed') boxDiv.style.position = 'fixed';
                 if (boxDiv.style.left !== '0px') boxDiv.style.left = '0px';
                 if (boxDiv.style.top !== '0px') boxDiv.style.top = '0px';
                 if (boxDiv.style.width !== '100vw') boxDiv.style.width = '100vw';
                 if (boxDiv.style.height !== '100vh') boxDiv.style.height = '100vh';
                 if (boxDiv.style.zIndex !== '1000') boxDiv.style.zIndex = '1000';
+                if (boxDiv.style.transform !== 'none') boxDiv.style.transform = 'none';
             } else {
+                const normalParent = room.containerSpaceElement || room.element;
+                if (normalParent && boxDiv.parentNode !== normalParent) {
+                    normalParent.appendChild(boxDiv);
+                }
                 if (boxDiv.style.position === 'fixed') {
                     boxDiv.style.position = 'absolute';
                     boxDiv.style.zIndex = '';
                 }
-                const newLeft = (box.x + room.offset.x) + 'px';
-                const newTop = (box.y + room.offset.y) + 'px';
+                const newLeft = box.x + 'px';
+                const newTop = box.y + 'px';
                 if (boxDiv.style.left !== newLeft) boxDiv.style.left = newLeft;
                 if (boxDiv.style.top !== newTop) boxDiv.style.top = newTop;
 
@@ -1744,6 +1856,7 @@ export const room = {
                 const newHeight = box.height + 'px';
                 if (boxDiv.style.width !== newWidth) boxDiv.style.width = newWidth;
                 if (boxDiv.style.height !== newHeight) boxDiv.style.height = newHeight;
+                if (boxDiv.style.transform !== '') boxDiv.style.transform = '';
             }
 
             const existingTagDot = boxDiv.querySelector('.tag-dot');
@@ -1970,14 +2083,14 @@ export const room = {
                 strokeColor = '#ff0000';
             }
 
-            const x1 = path.x1 + room.offset.x;
-            const y1 = path.y1 + room.offset.y;
-            const cp1x = path.cp1x + room.offset.x;
-            const cp1y = path.cp1y + room.offset.y;
-            const cp2x = path.cp2x + room.offset.x;
-            const cp2y = path.cp2y + room.offset.y;
-            const x2 = path.x2 + room.offset.x;
-            const y2 = path.y2 + room.offset.y;
+            const x1 = path.x1;
+            const y1 = path.y1;
+            const cp1x = path.cp1x;
+            const cp1y = path.cp1y;
+            const cp2x = path.cp2x;
+            const cp2y = path.cp2y;
+            const x2 = path.x2;
+            const y2 = path.y2;
 
             const arrowGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             if (!relatedArrow.id) {
@@ -1994,7 +2107,7 @@ export const room = {
             const d = `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
             pathElement.setAttribute('d', d);
             pathElement.setAttribute('stroke', strokeColor);
-            pathElement.setAttribute('stroke-width', isSelected ? '2.5' : '1.5');
+            pathElement.setAttribute('stroke-width', String(isSelected ? 2.5 : 1.5));
             pathElement.setAttribute('fill', 'none');
             pathElement.setAttribute('stroke-linecap', 'round');
             pathElement.setAttribute('stroke-linejoin', 'round');
@@ -2023,7 +2136,7 @@ export const room = {
             headPath.setAttribute('d', headD);
             headPath.setAttribute('fill', strokeColor);
             headPath.setAttribute('stroke', strokeColor);
-            headPath.setAttribute('stroke-width', isSelected ? '2.5' : '1.5');
+            headPath.setAttribute('stroke-width', String(isSelected ? 2.5 : 1.5));
             
             arrowGroup.appendChild(pathElement);
             arrowGroup.appendChild(hitArea);
@@ -2080,14 +2193,14 @@ export const room = {
                     strokeColor = '#f59e0b';
                 }
 
-                const x1 = path.x1 + room.offset.x;
-                const y1 = path.y1 + room.offset.y;
-                const cp1x = path.cp1x + room.offset.x;
-                const cp1y = path.cp1y + room.offset.y;
-                const cp2x = path.cp2x + room.offset.x;
-                const cp2y = path.cp2y + room.offset.y;
-                const x2 = path.x2 + room.offset.x;
-                const y2 = path.y2 + room.offset.y;
+                const x1 = path.x1;
+                const y1 = path.y1;
+                const cp1x = path.cp1x;
+                const cp1y = path.cp1y;
+                const cp2x = path.cp2x;
+                const cp2y = path.cp2y;
+                const x2 = path.x2;
+                const y2 = path.y2;
 
                 const arrowGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
                 if (!relatedArrow.id) {
@@ -2104,7 +2217,7 @@ export const room = {
                 const d = `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
                 pathElement.setAttribute('d', d);
                 pathElement.setAttribute('stroke', strokeColor);
-                pathElement.setAttribute('stroke-width', isSelected ? '2.5' : '1.5');
+                pathElement.setAttribute('stroke-width', String(isSelected ? 2.5 : 1.5));
                 pathElement.setAttribute('fill', 'none');
                 pathElement.setAttribute('stroke-linecap', 'round');
                 pathElement.setAttribute('stroke-linejoin', 'round');
@@ -2133,7 +2246,7 @@ export const room = {
                 headPath.setAttribute('d', headD);
                 headPath.setAttribute('fill', strokeColor);
                 headPath.setAttribute('stroke', strokeColor);
-                headPath.setAttribute('stroke-width', isSelected ? '2.5' : '1.5');
+                headPath.setAttribute('stroke-width', String(isSelected ? 2.5 : 1.5));
 
                 arrowGroup.appendChild(pathElement);
                 arrowGroup.appendChild(hitArea);
@@ -2146,7 +2259,7 @@ export const room = {
     },
 
     getResizeDirection(box, x, y) {
-        const margin = 8;
+        const margin = 8 / room.zoom;
         const lx = x - box.x;
         const ly = y - box.y;
         const w = box.width;
@@ -2219,12 +2332,12 @@ export const room = {
             if (isSelected) {
                 arrowGroup.classList.add('selected');
                 arrowGroup.querySelectorAll('path').forEach(path => {
-                    path.setAttribute('stroke-width', '2.5');
+                    path.setAttribute('stroke-width', String(2.5));
                 });
             } else {
                 arrowGroup.classList.remove('selected');
                 arrowGroup.querySelectorAll('path').forEach(path => {
-                    path.setAttribute('stroke-width', '1.5');
+                    path.setAttribute('stroke-width', String(1.5));
                 });
             }
             
@@ -2260,10 +2373,10 @@ export const room = {
             const dy = targetY - sourceCenter.y;
             const sourceEdge = room.getBoxEdgePoint(room.connectingFrom, dx, dy);
 
-            const x1 = sourceEdge.x + room.offset.x;
-            const y1 = sourceEdge.y + room.offset.y;
-            const x2 = targetX + room.offset.x;
-            const y2 = targetY + room.offset.y;
+            const x1 = sourceEdge.x;
+            const y1 = sourceEdge.y;
+            const x2 = targetX;
+            const y2 = targetY;
 
             const previewLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             previewLine.setAttribute('x1', x1);
@@ -2271,7 +2384,7 @@ export const room = {
             previewLine.setAttribute('x2', x2);
             previewLine.setAttribute('y2', y2);
             previewLine.setAttribute('stroke', room.connectingTo ? '#10b981' : '#3b82f6');
-            previewLine.setAttribute('stroke-width', '2');
+            previewLine.setAttribute('stroke-width', String(2));
             previewLine.setAttribute('stroke-dasharray', '5,5');
             previewLine.setAttribute('stroke-linecap', 'round');
             room.previewConnection = previewLine;
@@ -2287,8 +2400,8 @@ export const room = {
 
         if (room.selectionRect) {
             const rect = room.selectionRect;
-            const x = rect.x + room.offset.x;
-            const y = rect.y + room.offset.y;
+            const x = rect.x;
+            const y = rect.y;
 
             const selectionRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             selectionRect.setAttribute('x', x);
@@ -2297,7 +2410,7 @@ export const room = {
             selectionRect.setAttribute('height', rect.height);
             selectionRect.setAttribute('fill', 'rgba(59, 130, 246, 0.1)');
             selectionRect.setAttribute('stroke', '#3b82f6');
-            selectionRect.setAttribute('stroke-width', '1');
+            selectionRect.setAttribute('stroke-width', String(1));
             selectionRect.setAttribute('stroke-dasharray', '5,5');
             room.arrowSpaceElement.appendChild(selectionRect);
         }
@@ -3016,7 +3129,7 @@ export const room = {
         const state = room.serializeState();
         const roomKey = this._activeRoomKey || this.getActiveRoomKey();
         this._safeSetItem(this._getRoomStorageKey('nodeState', roomKey), JSON.stringify(state));
-        this._safeSetItem(this._getRoomStorageKey('nodeLocalState', roomKey), JSON.stringify({ offset: room.offset }));
+        this._safeSetItem(this._getRoomStorageKey('nodeLocalState', roomKey), JSON.stringify({ offset: room.offset, zoom: room.zoom }));
         this._touchRoomKey(roomKey);
         if (this.onStateChanged) {
             this.onStateChanged(immediate);
@@ -3038,6 +3151,7 @@ export const room = {
         if (deserialized.offset) {
             room.offset = deserialized.offset;
         }
+        this.applyViewTransform();
 
         room.selectedBox = null;
         room.selectedBoxes = [];
@@ -3232,12 +3346,10 @@ export const room = {
         
         // Pan the room by adjusting the offset so the box appears centered
         // The offset moves the viewport, not the box
-        this.offset.x = viewportCenterX - boxCenterX;
-        this.offset.y = viewportCenterY - boxCenterY;
+        this.offset.x = viewportCenterX - boxCenterX * this.zoom;
+        this.offset.y = viewportCenterY - boxCenterY * this.zoom;
         
-        // Redraw everything with the new offset (this pans the view)
-        // Pass false for updateContent to prevent text updates in drawBox during panning
-        this.drawAll(false, false);
+        this.applyViewTransform();
         this.saveState();
     },
 

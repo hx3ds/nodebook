@@ -266,8 +266,7 @@ export const roomEventHandlers = {
                 room.offset.y += dy;
                 room.lastPanPos = { x: e.clientX, y: e.clientY };
 
-                room.drawAll(false, false);
-                room.updateSelectionPreview();
+                room.applyViewTransform();
                 break;
             }
         }
@@ -400,6 +399,21 @@ export const roomEventHandlers = {
         room.event = null;
     },
 
+    handleWheel(e) {
+        const ctrlOrCmd = e.ctrlKey || e.metaKey;
+        if (!ctrlOrCmd) return;
+        if (room.editingBox) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (e.deltaY < 0) {
+            room.zoomIn(e.clientX, e.clientY);
+        } else if (e.deltaY > 0) {
+            room.zoomOut(e.clientX, e.clientY);
+        }
+    },
+
     handleContextMenu(e) {
         e.preventDefault();
         // Context menu is handled in handleMouseDown with right click
@@ -502,6 +516,24 @@ export const roomEventHandlers = {
         }
 
         const ctrlOrCmd = e.ctrlKey || e.metaKey;
+
+        if (ctrlOrCmd && (e.key === '=' || e.key === '+')) {
+            e.preventDefault();
+            room.zoomIn();
+            return;
+        }
+
+        if (ctrlOrCmd && (e.key === '-' || e.key === '_')) {
+            e.preventDefault();
+            room.zoomOut();
+            return;
+        }
+
+        if (ctrlOrCmd && e.key === '0') {
+            e.preventDefault();
+            room.resetZoom();
+            return;
+        }
 
         // Tab to switch to next box, Shift+Tab to switch to previous box
         if (e.key === 'Tab') {

@@ -320,7 +320,30 @@ export class ProfilePlugin {
 
         const content = document.createElement('div');
         content.style.marginTop = '20px';
-        content.textContent = 'Nodebook-wide settings will go here.';
+        
+        const wrapRow = document.createElement('label');
+        wrapRow.style.display = 'flex';
+        wrapRow.style.alignItems = 'center';
+        wrapRow.style.gap = '10px';
+        wrapRow.style.cursor = 'pointer';
+
+        const wrapCheckbox = document.createElement('input');
+        wrapCheckbox.type = 'checkbox';
+        wrapCheckbox.checked = localStorage.getItem('nodeBoxWordWrap') === 'true';
+
+        const wrapText = document.createElement('span');
+        wrapText.textContent = 'Word wrap in boxes';
+
+        wrapCheckbox.addEventListener('change', () => {
+            localStorage.setItem('nodeBoxWordWrap', String(wrapCheckbox.checked));
+            if (window.room && typeof window.room.applyBoxWordWrapSetting === 'function') {
+                window.room.applyBoxWordWrapSetting(wrapCheckbox.checked);
+            }
+        });
+
+        wrapRow.appendChild(wrapCheckbox);
+        wrapRow.appendChild(wrapText);
+        content.appendChild(wrapRow);
         container.appendChild(content);
     }
 }

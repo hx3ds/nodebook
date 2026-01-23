@@ -3,39 +3,44 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"mesh/api"
 	"mesh/config"
 	"mesh/db"
 	"mesh/ws"
 	"net/http"
+	"os"
 	"time"
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, nil)))
+
 	// 1. Load Config
 	cfg, err := config.LoadConfig("../mesh.json")
 	if err != nil {
 		// Fallback to local mesh.json if parent not found
 		cfg, err = config.LoadConfig("mesh.json")
 		if err != nil {
-			log.Fatalf("Failed to load config: %v", err)
+			slog.Error("Failed to load config", "err", err)
+			os.Exit(1)
 		}
 	}
 
 	// 2. Init DB
 	database, err := db.InitDB(cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		slog.Error("Failed to connect to database", "err", err)
+		os.Exit(1)
 	}
 	defer database.Close()
 
 	// 3. Fetch Bot Username
 	botUsername, err := fetchBotUsername(cfg)
 	if err != nil {
-		log.Printf("Warning: Failed to fetch bot username: %v", err)
+		slog.Warn("Failed to fetch bot username", "err", err)
 	} else {
-		log.Printf("Bot Username: %s", botUsername)
+		slog.Info("Bot username resolved", "botUsername", botUsername)
 	}
 
 	// 4. Setup Handler
@@ -69,9 +74,10 @@ func main() {
 	handler := corsMiddleware(mux)
 
 	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
-	log.Printf("Server starting on %s", addr)
+	slog.Info("Server starting", "addr", addr)
 	if err := http.ListenAndServe(addr, handler); err != nil {
-		log.Fatalf("Server failed: %v", err)
+		slog.Error("Server failed", "err", err)
+		os.Exit(1)
 	}
 }
 
