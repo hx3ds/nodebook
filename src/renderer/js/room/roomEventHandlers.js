@@ -401,16 +401,59 @@ export const roomEventHandlers = {
 
     handleWheel(e) {
         const ctrlOrCmd = e.ctrlKey || e.metaKey;
-        if (!ctrlOrCmd) return;
+        if (ctrlOrCmd) {
+            if (room.editingBox) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (e.deltaY < 0) {
+                room.zoomIn(e.clientX, e.clientY);
+            } else if (e.deltaY > 0) {
+                room.zoomOut(e.clientX, e.clientY);
+            }
+            return;
+        }
+
         if (room.editingBox) return;
+
+        const target = e.target;
+        const textContainer = target && target.closest ? target.closest('.box-text-container') : null;
+
+        const deltaModeFactor = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? window.innerHeight : 1);
+        const shiftAsHorizontal = e.shiftKey && e.deltaX === 0;
+        const dx = (e.deltaX + (shiftAsHorizontal ? e.deltaY : 0)) * deltaModeFactor;
+        const dy = (shiftAsHorizontal ? 0 : e.deltaY) * deltaModeFactor;
+
+        if (textContainer) {
+            const canScrollX = textContainer.scrollWidth > textContainer.clientWidth + 1;
+            const canScrollY = textContainer.scrollHeight > textContainer.clientHeight + 1;
+
+            if (canScrollX || canScrollY) {
+                const atLeft = textContainer.scrollLeft <= 0;
+                const atRight = textContainer.scrollLeft + textContainer.clientWidth >= textContainer.scrollWidth - 1;
+                const atTop = textContainer.scrollTop <= 0;
+                const atBottom = textContainer.scrollTop + textContainer.clientHeight >= textContainer.scrollHeight - 1;
+
+                const scrollingInsideX = dx < 0 ? !atLeft : (dx > 0 ? !atRight : false);
+                const scrollingInsideY = dy < 0 ? !atTop : (dy > 0 ? !atBottom : false);
+
+                if ((canScrollX && scrollingInsideX) || (canScrollY && scrollingInsideY)) {
+                    return;
+                }
+            }
+        }
+
+        if (dx === 0 && dy === 0) return;
 
         e.preventDefault();
         e.stopPropagation();
 
-        if (e.deltaY < 0) {
-            room.zoomIn(e.clientX, e.clientY);
-        } else if (e.deltaY > 0) {
-            room.zoomOut(e.clientX, e.clientY);
+        room.offset.x -= dx;
+        room.offset.y -= dy;
+        room.applyViewTransform();
+        if (typeof room._scheduleViewStatePersist === 'function') {
+            room._scheduleViewStatePersist();
         }
     },
 
