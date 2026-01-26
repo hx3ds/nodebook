@@ -2,6 +2,12 @@ import { room } from './room.js';
 import { explorer } from '../explorer/explorer.js';
 import { panel } from '../panel/panel.js';
 
+const wheelGesture = {
+    mode: null,
+    textContainer: null,
+    lastTime: 0
+};
+
 export const roomEventHandlers = {
     // Main event handlers
     handleDblClick(e) {
@@ -426,21 +432,45 @@ export const roomEventHandlers = {
         const dx = (e.deltaX + (shiftAsHorizontal ? e.deltaY : 0)) * deltaModeFactor;
         const dy = (shiftAsHorizontal ? 0 : e.deltaY) * deltaModeFactor;
 
-        if (textContainer) {
-            const canScrollX = textContainer.scrollWidth > textContainer.clientWidth + 1;
-            const canScrollY = textContainer.scrollHeight > textContainer.clientHeight + 1;
+        if (dx === 0 && dy === 0) return;
 
-            if (canScrollX || canScrollY) {
-                e.preventDefault();
-                e.stopPropagation();
+        const now = Date.now();
+        const gestureWindowMs = 140;
+        const isContinuation = now - wheelGesture.lastTime < gestureWindowMs;
+        wheelGesture.lastTime = now;
 
-                if (canScrollX && dx !== 0) textContainer.scrollLeft += dx;
-                if (canScrollY && dy !== 0) textContainer.scrollTop += dy;
-                return;
+        const isTextContainerScrollable = (el) => {
+            if (!el) return false;
+            return el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+        };
+
+        if (!isContinuation || !wheelGesture.mode) {
+            if (isTextContainerScrollable(textContainer)) {
+                wheelGesture.mode = 'box';
+                wheelGesture.textContainer = textContainer;
+            } else {
+                wheelGesture.mode = 'room';
+                wheelGesture.textContainer = null;
             }
         }
 
-        if (dx === 0 && dy === 0) return;
+        if (wheelGesture.mode === 'box') {
+            const tc = wheelGesture.textContainer;
+            if (!tc || !tc.isConnected) {
+                wheelGesture.mode = 'room';
+                wheelGesture.textContainer = null;
+            } else {
+                const canScrollX = tc.scrollWidth > tc.clientWidth + 1;
+                const canScrollY = tc.scrollHeight > tc.clientHeight + 1;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (canScrollX && dx !== 0) tc.scrollLeft += dx;
+                if (canScrollY && dy !== 0) tc.scrollTop += dy;
+                return;
+            }
+        }
 
         e.preventDefault();
         e.stopPropagation();
